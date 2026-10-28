@@ -73,6 +73,12 @@
   #onBar button.on{background:linear-gradient(#ff7a9c,#e01e50);color:#fff;
     border-color:#ff4b8c;box-shadow:0 3px 0 rgba(0,0,0,.35),0 0 14px rgba(255,75,140,.7)}
   #onBar button b{font-size:13px;line-height:1}
+  #zoneTag{position:absolute;left:10px;top:112px;z-index:40;pointer-events:none;
+    font-weight:900;font-size:11px;letter-spacing:.5px;padding:3px 9px;border-radius:9px;
+    border:2px solid rgba(0,0,0,.35);background:rgba(28,60,140,.82);color:#d8ecff;
+    text-shadow:0 1px 2px rgba(0,0,0,.6)}
+  #zoneTag.red{background:rgba(180,24,58,.86);color:#ffe6ee;
+    box-shadow:0 0 14px rgba(255,60,110,.65);border-color:rgba(255,90,130,.7)}
   #onDot{width:8px;height:8px;border-radius:50%;background:#ff4b5c;box-shadow:0 0 6px currentColor}
   #onDot.ok{background:#4bff7a}
   #chat{position:absolute;left:10px;bottom:14px;width:min(300px,54vw);max-height:132px;z-index:12;
@@ -313,9 +319,11 @@
 
 <div id="onBar">
   <button id="btnChat"><b>💬</b><span id="onTxt">ЧАТ</span><i id="onDot"></i></button>
-  <button id="btnDuel"><b>⚔</b><span id="pvpTxt">ДУЭЛЬ</span></button>
+  <button id="btnPve" class="on"><b>🛡</b><span>ПВЕ</span></button>
+  <button id="btnPvp"><b>⚔</b><span>ПВП</span></button>
   <button id="btnTop"><b>🏆</b><span>ТОП</span></button>
 </div>
+<div id="zoneTag">🛡 ПВЕ-зона</div>
 
 <div class="ov on" id="start">
   <h1>МИР ОХОТЫ</h1>
@@ -5337,6 +5345,54 @@ for (let i = 0; i < 22; i++) {
   scene.add(g);
 })();
 
+/* ═══ ЗОНЫ: красный круг PvP в центре, синяя PvE вокруг ═══ */
+const ZONE_R = 62;                                  /* радиус красной зоны */
+function inPvpZone(x, z) { return x * x + z * z < ZONE_R * ZONE_R; }
+const zoneTex = (function () {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d');
+  g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineWidth = 3;
+  g.beginPath(); g.arc(32, 32, 26, 0, 6.3); g.stroke();
+  const tx = new T.CanvasTexture(c);
+  tx.wrapS = tx.wrapT = T.RepeatWrapping;
+  return tx;
+})();
+(function zones() {
+  /* синяя PvE-заливка на весь остальной мир */
+  const blue = new T.Mesh(
+    new T.RingGeometry(ZONE_R, 210, 96, 1),
+    new T.MeshBasicMaterial({ color: 0x1f6fe0, transparent: true, opacity: 0.46, depthWrite: false, side: T.DoubleSide })
+  );
+  blue.rotation.x = -Math.PI / 2; blue.position.y = GROUND_Y + 0.10;
+  blue.renderOrder = 2;
+  scene.add(blue);
+  /* красная PvP-заливка в центре */
+  const red = new T.Mesh(
+    new T.CircleGeometry(ZONE_R, 96),
+    new T.MeshBasicMaterial({ color: 0xe01246, transparent: true, opacity: 0.55, depthWrite: false, side: T.DoubleSide })
+  );
+  red.rotation.x = -Math.PI / 2; red.position.y = GROUND_Y + 0.11;
+  red.renderOrder = 3;
+  scene.add(red);
+  /* светящаяся граница круга + пунктир внутри */
+  const edge = new T.Mesh(
+    new T.RingGeometry(ZONE_R - 1.4, ZONE_R + 1.4, 96, 1),
+    new T.MeshBasicMaterial({ color: 0xff4d6d, transparent: true, opacity: 1.0, depthWrite: false, side: T.DoubleSide })
+  );
+  edge.rotation.x = -Math.PI / 2; edge.position.y = GROUND_Y + 0.13;
+  edge.renderOrder = 4;
+  scene.add(edge);
+  zoneTex.repeat.set(40, 40);
+  const grid = new T.Mesh(
+    new T.CircleGeometry(ZONE_R, 96),
+    new T.MeshBasicMaterial({ map: zoneTex, transparent: true, opacity: 0.30, depthWrite: false })
+  );
+  grid.rotation.x = -Math.PI / 2; grid.position.y = GROUND_Y + 0.12;
+  grid.renderOrder = 4;
+  scene.add(grid);
+  window.__zoneEdge = edge;
+})();
+
 /* ═══ пропсы по обочинам ═══ */
 const props = [];
 const PROP_SIDE = [];
@@ -6471,6 +6527,8 @@ function killObj(o) {
   G.kills = (G.kills || 0) + 1;
   const mult = 1 + Math.min(1.2, (R.combo - 1) * 0.08);
   let gold = Math.max(1, Math.round(o.gold * (1 + G.up.gold * 0.1 + gearBonus('gold') * 0.1 + petBonus('gold')) * mult));
+  /* в красной PvP-зоне дроп +50 % */
+  if (inPvpZone(o.g.position.x, o.g.position.z)) gold = Math.round(gold * 1.5);
   const double = Math.random() < luckCh();
   if (double) gold *= 2;
   R.coins += gold;
@@ -6532,14 +6590,17 @@ function matDrop(tier, boss) {
 }
 function dropMats(o) {
   const d = matDrop(R.tier, !!o.boss);
+  const ox = o.g.position.x, oz = o.g.position.z;
+  /* в красной PvP-зоне материалов +50 % */
+  const pvpBonus = inPvpZone(ox, oz);
+  if (pvpBonus) for (const k in d) d[k] = Math.max(1, Math.round(d[k] * 1.5));
   const parts = [];
   for (const k in d) {
     G.mat[k] = (G.mat[k] || 0) + d[k];
     const m = MATNAME[k];
     parts.push(m.ic + ' +' + d[k]);
   }
-  const ox = o.g.position.x, oz = o.g.position.z;
-  dn(parts.join(' '), ox, 2.4, oz, 'c');
+  dn(parts.join(' ') + (pvpBonus ? ' 🔥' : ''), ox, 2.4, oz, 'c');
   burst(ox, 1.4, oz, 0xa8e6ff, 10);
   /* авто-крафт: сразу пробуем собрать лучший предмет */
   if (G.autoCraft) autoCraftStep();
@@ -6905,6 +6966,24 @@ let downX = 0, downY = 0, downT = 0, moved = false;
 /* ── авто-движение: ищет ближайшую добычу, обходит препятствия ── */
 function autoMove() {
   let bestScore = -1e9, tx = null, tz = null;
+  /* ── режим ПВП: держимся в красном круге и идём на ближайшего игрока ── */
+  if (window.__pvpMode) {
+    const st = window.__pvpSteer ? window.__pvpSteer() : null;
+    if (st) { tx = st.x; tz = st.z; }
+    else if (!inPvpZone(R.px, R.pz)) {
+      const d = Math.hypot(R.px, R.pz) || 1;
+      tx = R.px * (ZONE_R * 0.7) / d; tz = R.pz * (ZONE_R * 0.7) / d;
+      if (d < 1) { tx = 0; tz = 0; }
+    }
+    if (tx != null) {
+      const dx0 = tx - R.px, dz0 = tz - R.pz;
+      const L0 = Math.hypot(dx0, dz0) || 1;
+      if (L0 < 1.5) { R.mvx = 0; R.mvz = 0; return; }
+      R.mvx = dx0 / L0; R.mvz = dz0 / L0;
+      UI.hint.classList.remove('on');
+      return;
+    }
+  }
   for (const o of objs) {
     if (o.dead || o.dying != null) continue;
     const d = distTo(o);
@@ -7596,6 +7675,7 @@ window.__T = T; window.__pop = popText; window.__chat = 1; window.__save = save;
 window.__hurt = hurt; window.__dmgNow = dmgNow; window.__gameOver = gameOver;
 window.__atkAnim = heroAttackAnim; window.__power = () => gearScore();
 window.__coin = (n) => { G.coins = Math.max(0, G.coins + n); save(); syncHUD(); };
+window.__pvpZone = inPvpZone; window.__ZONE_R = ZONE_R;
 })();
 
 </script>
@@ -7610,6 +7690,10 @@ window.__coin = (n) => { G.coins = Math.max(0, G.coins + n); save(); syncHUD(); 
   const G = window.__G, R = window.__R, T = window.__T;
   const scene = window.__scene, instRig = window.__instRig, RIG = window.__RIG;
   const $ = (id) => document.getElementById(id);
+
+  /* ── ЗОНЫ: красный круг PvP в центре, всё вокруг — синяя PvE ── */
+  const ZONE_R = window.__ZONE_R || 62;
+  const inZone = (x, z) => x * x + z * z < ZONE_R * ZONE_R;
 
   /* единственная общая «комната» мира; префикс нарочно уникальный */
   const NS = 'wr/zv1/';
@@ -7763,13 +7847,26 @@ window.__coin = (n) => { G.coins = Math.max(0, G.coins + n); save(); syncHUD(); 
         p.init = 0; p.tgt = null;
       }
       p.tgtT -= dt;
+      if (ON.pvp && !inZone(p.x, p.z)) { p.tgt = null; p.tgtT = 0; }
       if (!p.tgt || p.tgtT <= 0) {
-        const a = Math.random() * 6.28, d = 9 + Math.random() * 38;
-        p.tgt = {
-          x: Math.max(-146, Math.min(146, R.px + Math.cos(a) * d)),
-          z: Math.max(-146, Math.min(146, R.pz + Math.sin(a) * d))
-        };
-        p.tgtT = 4 + Math.random() * 7;
+        if (ON.pvp) {
+          /* в ПВП-режиме боты держатся в красном круге рядом с героем */
+          const a = Math.random() * 6.28, d = 6 + Math.random() * 26;
+          const bx = inZone(R.px, R.pz) ? R.px : (R.px * ZONE_R * 0.55 / (Math.hypot(R.px, R.pz) || 1));
+          const bz = inZone(R.px, R.pz) ? R.pz : (R.pz * ZONE_R * 0.55 / (Math.hypot(R.px, R.pz) || 1));
+          let tx0 = bx + Math.cos(a) * d, tz0 = bz + Math.sin(a) * d;
+          const dd = Math.hypot(tx0, tz0) || 1;
+          if (dd > ZONE_R * 0.9) { tx0 *= ZONE_R * 0.9 / dd; tz0 *= ZONE_R * 0.9 / dd; }
+          p.tgt = { x: tx0, z: tz0 };
+          p.tgtT = 2.5 + Math.random() * 3;
+        } else {
+          const a = Math.random() * 6.28, d = 9 + Math.random() * 38;
+          p.tgt = {
+            x: Math.max(-146, Math.min(146, R.px + Math.cos(a) * d)),
+            z: Math.max(-146, Math.min(146, R.pz + Math.sin(a) * d))
+          };
+          p.tgtT = 4 + Math.random() * 7;
+        }
       }
       const dx = p.tgt.x - p.x, dz = p.tgt.z - p.z;
       const len = Math.sqrt(dx * dx + dz * dz) || 1;
@@ -7801,6 +7898,28 @@ window.__coin = (n) => { G.coins = Math.max(0, G.coins + n); save(); syncHUD(); 
       }
     }
   }
+
+  /* куда идти в ПВП-режиме: ближайший игрок в круге, иначе — к центру */
+  function pvpSteer() {
+    let best = null, bd = 1e9;
+    for (const id in ON.peers) {
+      const p = ON.peers[id];
+      if (!inZone(p.x, p.z)) continue;
+      const d = (p.x - R.px) ** 2 + (p.z - R.pz) ** 2;
+      if (d < bd) { bd = d; best = p; }
+    }
+    if (best) {
+      const d = Math.sqrt(bd);
+      if (d > 2.6) return { x: best.x, z: best.z };   /* подходим на удар */
+      return { x: R.px, z: R.pz };                    /* вплотную — стоим и бьём */
+    }
+    /* никого — держимся внутри круга */
+    const d0 = Math.hypot(R.px, R.pz) || 1;
+    if (d0 > ZONE_R * 0.72) return { x: R.px * (ZONE_R * 0.6) / d0, z: R.pz * (ZONE_R * 0.6) / d0 };
+    return { x: R.px, z: R.pz };
+  }
+  window.__pvpSteer = pvpSteer;
+  window.__pvpZone = inZone;
 
   function peerTick(dt) {
     const now = performance.now();
@@ -7883,9 +8002,19 @@ window.__coin = (n) => { G.coins = Math.max(0, G.coins + n); save(); syncHUD(); 
   function pvpTick(dt) {
     if (!ON.pvp || !R.on) return;
     ON.atkT -= dt;
+    /* вне красной зоны PvP не работает: сначала надо зайти в круг */
+    if (!inZone(R.px, R.pz)) {
+      if (ON.atkT <= 0 && !ON.zoneWarned) {
+        ON.atkT = 4; ON.zoneWarned = 1;
+        chatPush({ sys: 1, m: '🔵 ПВЕ-зона: PvP запрещено, иди в красный круг к центру' });
+      }
+      return;
+    }
+    ON.zoneWarned = 0;
     let best = null, bd = 1e9;
     for (const id in ON.peers) {
       const p = ON.peers[id];
+      if (!inZone(p.x, p.z)) continue;
       const d = (p.x - R.px) ** 2 + (p.z - R.pz) ** 2;
       if (d < bd) { bd = d; best = p; }
     }
@@ -7999,6 +8128,8 @@ window.__coin = (n) => { G.coins = Math.max(0, G.coins + n); save(); syncHUD(); 
 
   function duelIncoming(m) {
     if (ON.tt) return;
+    /* дуэли разрешены только в красном круге */
+    if (!inZone(R.px, R.pz)) return;
     if (ON.lastDuel && performance.now() - ON.lastDuel < 15000) return;
     if (ON.duel) return;            /* уже висит входящий вызов */
     if (ON.awaitDuel) return;       /* мы сами кого-то вызвали — не отвлекаем */
@@ -8038,10 +8169,15 @@ window.__coin = (n) => { G.coins = Math.max(0, G.coins + n); save(); syncHUD(); 
   /* вызвать ближайшего игрока */
   function challengeNearest() {
     if (ON.tt) { chatPush({ sys: 1, m: 'дуэль уже идёт' }); return; }
+    if (!inZone(R.px, R.pz)) {
+      chatPush({ sys: 1, m: '🔵 в ПВЕ-зоне дуэли запрещены — иди в красный круг' });
+      return;
+    }
     if (ON.awaitDuel) { chatPush({ sys: 1, m: 'уже ждём ответа на вызов' }); return; }
     let best = null, bd = 1e9, bestBot = null, bbd = 1e9;
     for (const id in ON.peers) {
       const p = ON.peers[id];
+      if (!inZone(p.x, p.z)) continue;
       const d = (p.x - R.px) ** 2 + (p.z - R.pz) ** 2;
       if (p.bot) { if (d < bbd) { bbd = d; bestBot = p; } }
       else if (d < bd) { bd = d; best = p; }
@@ -8049,7 +8185,7 @@ window.__coin = (n) => { G.coins = Math.max(0, G.coins + n); save(); syncHUD(); 
     /* боты отвечают всегда — если рядом есть бот, вызываем его;
        живого игрока зовём только когда ботов нет вовсе */
     if (bestBot) best = bestBot;
-    if (!best) { chatPush({ sys: 1, m: 'рядом никого — некого вызвать' }); return; }
+    if (!best) { chatPush({ sys: 1, m: 'в круге никого — некого вызвать' }); return; }
     pub('c', { t: 'd', id: MYID, n: NAME, to: best.id, pow: power() });
     chatPush({ sys: 1, m: '⚔ вызов отправлен: ' + best.n + ' · ждём 15 c' });
     ON.lastDuel = performance.now();
@@ -8368,8 +8504,34 @@ window.__coin = (n) => { G.coins = Math.max(0, G.coins + n); save(); syncHUD(); 
   }
 
   /* ═══ HUD-кнопки ═══ */
+  function setMode(pvp) {
+    ON.pvp = pvp ? 1 : 0;
+    window.__pvpMode = !!pvp;
+    const a = $('btnPve'), b = $('btnPvp');
+    if (a) a.classList.toggle('on', !pvp);
+    if (b) b.classList.toggle('on', !!pvp);
+    if (pvp) {
+      chatPush({ sys: 1, m: '⚔ ПВП-режим: держусь в красном круге, атакую игроков · дроп +50 %' });
+      if (G.auto) chatPush({ sys: 1, m: '🤖 автопилот ведёт к центру' });
+    } else {
+      chatPush({ sys: 1, m: '🛡 ПВЕ-режим: только монстры, дуэли выключены' });
+    }
+    renderZone();
+  }
+  /* плашка текущей зоны внизу HUD */
+  function renderZone() {
+    const t = $('zoneTag');
+    if (!t) return;
+    const red = inZone(R.px, R.pz);
+    t.className = red ? 'red' : '';
+    t.textContent = red
+      ? '🔥 PVP-зона · дроп +50%'
+      : '🛡 ПВЕ-зона' + (ON.pvp ? ' · иду в круг' : '');
+  }
+  window.__renderZone = renderZone;
+
   function boot() {
-    const bChat = $('btnChat'), bDuel = $('btnDuel');
+    const bChat = $('btnChat');
     if (!bChat) return;
     bChat.onclick = () => {
       const c = $('chat');
@@ -8381,11 +8543,16 @@ window.__coin = (n) => { G.coins = Math.max(0, G.coins + n); save(); syncHUD(); 
       e.stopPropagation();
       if (e.key === 'Enter') { sendChat(); e.preventDefault(); }
     });
-    /* ⚔ кнопка = вызвать на дуэль в крестики-нолики */
-    bDuel.onclick = () => {
-      if (ON.tt) { chatPush({ sys: 1, m: 'дуэль уже идёт' }); return; }
-      challengeNearest();
+    /* 🛡 ПВЕ / ⚔ ПВП — вместо старой кнопки «ДУЭЛЬ» */
+    const bPve = $('btnPve'), bPvp = $('btnPvp');
+    if (bPve) bPve.onclick = () => setMode(0);
+    if (bPvp) bPvp.onclick = () => {
+      /* второе нажатие в ПВП = вызов на дуэль (крестики-нолики) */
+      if (ON.pvp) { if (ON.tt) { chatPush({ sys: 1, m: 'дуэль уже идёт' }); return; } challengeNearest(); }
+      else setMode(1);
     };
+    setMode(ON.pvp ? 1 : 0);
+    renderZone();
     const bTop = $('btnTop');
     if (bTop) bTop.onclick = () => { renderTop(); $('topBox').classList.add('on'); };
     const tClose = $('topClose');
@@ -8420,6 +8587,7 @@ window.__coin = (n) => { G.coins = Math.max(0, G.coins + n); save(); syncHUD(); 
     pvpTick(dt);
     duelTick(dt);
     peerTick(dt);
+    renderZone();
     /* сторожевой таймер: свой ретранслятор не умеет сам лечиться — если он
        молча умер, переподключаемся. mqtt.js лечится сам. */
     if (!ON.mq || !ON.mq.alive) {
