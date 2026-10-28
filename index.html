@@ -95,7 +95,7 @@
     display:none;flex-direction:column;align-items:center;gap:6px;padding:10px 14px;border-radius:16px;
     background:rgba(24,10,30,.9);border:3px solid #ff4b8c;box-shadow:0 0 22px rgba(255,75,140,.5);
     max-width:min(340px,88vw);text-align:center}
-  #duelBox.on{display:flex}
+  #duelBox.on{display:flex;pointer-events:auto}
   #duelBox .dl{font-size:11px;color:#ffd6e7;line-height:1.35}
   #duelBox .ds{font-size:9.5px;color:#b79bc4}
   #duelBox .dr{display:flex;gap:6px;margin-top:2px}
@@ -103,6 +103,31 @@
     cursor:pointer;font-family:inherit;font-weight:900;font-size:10px}
   #duelYes{background:linear-gradient(#a8ffb0,#33cc55);color:#0d3316}
   #duelNo{background:rgba(60,40,70,.9);color:#e6cfe0}
+  .dtm{width:100%;height:5px;border-radius:4px;background:rgba(255,255,255,.12);overflow:hidden}
+  #duelBar{display:block;height:100%;width:100%;background:linear-gradient(90deg,#ff4b8c,#ffcc33);
+    transform-origin:left center}
+
+  /* ── дуэль: крестики-нолики ── */
+  #ttBox{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:22;
+    display:none;flex-direction:column;align-items:center;gap:7px;padding:13px 15px;border-radius:18px;
+    background:rgba(20,9,28,.96);border:3px solid #ff4b8c;box-shadow:0 0 30px rgba(255,75,140,.55);
+    width:min(300px,92vw);pointer-events:auto}
+  #ttBox.on{display:flex}
+  #ttBox .th{font-size:11px;font-weight:900;color:#ff8fb8;letter-spacing:.6px;text-align:center}
+  #ttBox .ts{font-size:10.5px;color:#e7dcff;text-align:center;line-height:1.35}
+  .ttm{width:100%;height:6px;border-radius:4px;background:rgba(255,255,255,.12);overflow:hidden}
+  #ttBar{display:block;height:100%;width:100%;transform-origin:left center;
+    background:linear-gradient(90deg,#33e0ff,#a8ffb0)}
+  #ttGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;width:100%;aspect-ratio:1}
+  #ttGrid b{display:flex;align-items:center;justify-content:center;border-radius:12px;
+    background:rgba(255,255,255,.06);border:2px solid #3b2a52;cursor:pointer;
+    font-size:30px;font-weight:900;line-height:1;color:#ff5c9a;transition:background .12s}
+  #ttGrid b:hover:not(.f){background:rgba(255,75,140,.18)}
+  #ttGrid b.f{cursor:default;background:rgba(255,255,255,.02)}
+  #ttGrid b.x{color:#ff5c9a;text-shadow:0 0 12px rgba(255,92,154,.7)}
+  #ttGrid b.o{color:#4be0ff;text-shadow:0 0 12px rgba(75,224,255,.7)}
+  #ttGrid b.win{background:rgba(51,204,85,.3);border-color:#33cc55}
+  #ttBox .tr{font-size:10.5px;color:#c9b6dd;text-align:center;line-height:1.3;min-height:13px}
 
   /* ── таблица лидеров ── */
   #topBox{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:16;
@@ -255,7 +280,7 @@
   <div id="combo"></div>
   <div id="onBar">
     <button id="btnChat"><b>💬</b><span id="onTxt">ЧАТ</span><i id="onDot"></i></button>
-    <button id="btnDuel"><b>⚔</b><span id="pvpTxt">БОЙ</span></button>
+    <button id="btnDuel"><b>⚔</b><span id="pvpTxt">ДУЭЛЬ</span></button>
     <button id="btnTop"><b>🏆</b><span>ТОП</span></button>
   </div>
   <div id="chat">
@@ -265,7 +290,16 @@
   <div id="duelBox">
     <div class="dl" id="duelTxt"></div>
     <div class="ds" id="duelSub"></div>
-    <div class="dr"><button id="duelYes">ПРИНЯТЬ</button><button id="duelNo">НЕТ</button></div>
+    <div class="dtm"><i id="duelBar"></i></div>
+    <div class="dr"><button id="duelYes">ПРИНЯТЬ</button></div>
+  </div>
+  <div id="ttBox">
+    <div class="th">⚔ ДУЭЛЬ · КРЕСТИКИ-НОЛИКИ</div>
+    <div class="ts" id="ttSub"></div>
+    <div class="ttm"><i id="ttBar"></i></div>
+    <div id="ttGrid"></div>
+    <div class="tr" id="ttRes"></div>
+    <div class="tr" id="ttPot"></div>
   </div>
   <div id="topBox">
     <div class="th">🏆 ТАБЛИЦА ЛИДЕРОВ</div>
@@ -5156,7 +5190,7 @@ const scene = new T.Scene();
 scene.fog = new T.Fog(0xa8dcf5, 62, 150);
 
 const camera = new T.PerspectiveCamera(60, 1, 0.1, 500);
-const CAM = { y: 7.2, z: 12.4, look: 1.3, lookZ: -8.5 };
+const CAM = { y: 10.6, z: 18.6, look: 1.6, lookZ: -11 };
 camera.position.set(0, CAM.y, CAM.z);
 camera.lookAt(0, CAM.look, CAM.lookZ);
 
@@ -6144,7 +6178,7 @@ const R = {
   atkTimer: 0, atkAnim: 0, target: null, combo: 0, comboT: 0,
   rageT: 0, dashT: 0, ifrT: 0, shake: 0, steps: 0,
   nextSpawn: 12, t: 0, popped: 0, usedPhoenix: false, bossAlive: false,
-  cam: { x: 0, y: 5.2, z: 8.4, yaw: 0 }, manT: 0, inFw: 1
+  cam: { x: 0, y: 5.2, z: 8.4, yaw: 0 }, manT: 0, inFw: 1, spotRot: 0, spotNext: 0
 };
 const objs = [];
 const fx = [];
@@ -6273,13 +6307,39 @@ function ringPoint(minR, maxR) {
   return { x: R.px + Math.cos(a) * r, z: R.pz + Math.sin(a) * r };
 }
 
+/* ── 9 «гнёзд» спавна: фиксированные сектора вокруг героя ──
+   мобы выходят кучками из гнёзд, а не сыпятся со всех сторон.
+   Сколько гнёзд активно — растёт с онлайном (__onlineCount). */
+const SPOTS = 9;
+const spots = [];
+for (let i = 0; i < SPOTS; i++) spots.push({ a: (i / SPOTS) * 6.283, r: 13 + (i % 3) * 5, n: 0 });
+
+function activeSpots() {
+  let on = 3;
+  try { on = 3 + Math.min(6, (window.__onlineCount ? window.__onlineCount() : 1) - 1); } catch (e) { }
+  return Math.max(3, Math.min(SPOTS, on));
+}
+function spotPoint(i, spread) {
+  const s = spots[i % SPOTS];
+  const a = s.a + R.spotRot;
+  const r = s.r + (Math.random() - 0.5) * 7;
+  return {
+    x: R.px + Math.cos(a) * r + (Math.random() - 0.5) * (spread || 3),
+    z: R.pz + Math.sin(a) * r + (Math.random() - 0.5) * (spread || 3)
+  };
+}
+
 function spawnWave() {
   const tier = R.tier;
   const n = clamp(2 + Math.floor(tier / 1.6) + (Math.random() < 0.6 ? 1 : 0), 2, 5);
   const eliteP = Math.min(0.34, Math.max(0, (tier - 5) * 0.006));
   let eliteDone = false;
+  const na = activeSpots();
+  const base = (R.spotNext = ((R.spotNext || 0) + 1) % na);
   for (let i = 0; i < n; i++) {
-    const pt = ringPoint(7, 17);
+    /* 3/4 волны — из одного гнезда (кучно), остальные — из соседних */
+    const spot = Math.random() < 0.75 ? base : (base + 1 + ((Math.random() * (na - 1)) | 0)) % na;
+    const pt = spotPoint(spot, 4);
     const isObs = Math.random() < 0.18;
     const isElite = !isObs && !eliteDone && Math.random() < eliteP;
     if (isElite) eliteDone = true;
@@ -6288,7 +6348,7 @@ function spawnWave() {
   /* ── БОСС: приходит один, огромный, только он роняет материалы ── */
   if (R.on && !R.bossAlive && bossDue()) {
     R.bossAlive = true;
-    const pt = ringPoint(13, 18);
+    const pt = spotPoint(base, 2);
     addObj('mob', pt.x, pt.z, false, true);
     dxBossBanner();
   }
@@ -7105,7 +7165,7 @@ addEventListener('resize', resize); resize();
 function frame(now) {
   let dt = (now - last) / 1000; last = now;
   if (dt > 0.06) dt = 0.06;
-  if (!R.shopPause) step(dt);
+  if (!R.shopPause && !window.__duelPause) step(dt);
   if (window.__onTick) window.__onTick(dt);
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
@@ -7476,14 +7536,8 @@ function step(dt) {
     d.d.style.opacity = k > 0.65 ? (1 - (k - 0.65) / 0.35).toFixed(2) : '1';
   }
 
-  /* ── камера: следом за героем, плавно доворачивается за курсом ── */
+  /* ── камера: жёстко за героем, НЕ доворачивается за его курсом ── */
   if (R.manT > 0) R.manT = Math.max(0, R.manT - dt);
-  if (R._moving && R.manT <= 0) {
-    let dy = R.ang - R.cam.yaw;
-    while (dy > Math.PI) dy -= 6.283185;
-    while (dy < -Math.PI) dy += 6.283185;
-    R.cam.yaw += dy * Math.min(1, dt * 2.2);
-  }
   const cy = R.cam.yaw, cd = CAM.z;
   const tx2 = R.px - Math.sin(cy) * cd;
   const tz2 = R.pz - Math.cos(cy) * cd;
@@ -7573,9 +7627,19 @@ window.__coin = (n) => { G.coins = Math.max(0, G.coins + n); save(); syncHUD(); 
     duel: null,              /* {to,from,n,at} — входящий вызов */
     duelSent: 0, presT: 0, lastDuel: 0, points: 0,
     pvp: 0,                  /* ⚔ режим PvP: бьём игроков вокруг */
-    atkT: 0, killed: 0, robbed: 0
+    tt: null,                /* партия в крестики-нолики */
+    awaitDuel: null,         /* наш вызов, ждём ответа 15 c */
+    atkT: 0,
+    killed: 0, robbed: 0
   };
   window.__ON = ON;
+  /* сколько игроков сейчас в мире — от этого зависит число активных гнёзд спавна */
+  window.__onlineCount = function () {
+    let n = 1;
+    const now = performance.now();
+    for (const id in ON.peers) if (now - ON.peers[id].seen < 9000) n++;
+    return n;
+  };
 
   /* ── имя/очки: сила игрока для дуэли ── */
   function power() {
@@ -7763,6 +7827,8 @@ window.__coin = (n) => { G.coins = Math.max(0, G.coins + n); save(); syncHUD(); 
       if (m.t === 'm') chatPush({ n: p_name(m), m: String(m.m || '').slice(0, 90) });
       else if (m.t === 'd') duelIncoming(m);
       else if (m.t === 'da') duelAccepted(m);
+      else if (m.t === 'tt') ttRemote(m);
+      else if (m.t === 'ttw') ttRemoteWin(m);
       else if (m.t === 'k') { if (m.to === MYID) onKilled(m); }
       else if (m.t === 'kr') chatPush({ sys: 1, m: '💰 ты забрал ' + (m.rob || 0) + ' 🪙 у ' + p_name(m) });
       else if (m.t === 'dr') chatPush({ sys: 1, m: m.m || (p_name(m) + ' победил в дуэли') });
@@ -7880,20 +7946,42 @@ window.__coin = (n) => { G.coins = Math.max(0, G.coins + n); save(); syncHUD(); 
     return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
 
-  /* ═══ дуэли ═══ */
+  /* ═══ ДУЭЛЬ · КРЕСТИКИ-НОЛИКИ ═══
+     вызов живёт 15 c; не принял — проиграл и отдал 50 % монет.
+     на ход 10 c; не сходил — проиграл. ничья — без денег. */
+  const TT_ACCEPT = 15, TT_TURN = 10;
+  const WINL = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+
+  function ttWin(b, s) {
+    for (const l of WINL) if (b[l[0]] === s && b[l[1]] === s && b[l[2]] === s) return l;
+    return null;
+  }
+  function ttFull(b) { for (let i = 0; i < 9; i++) if (!b[i]) return false; return true; }
+
   function duelIncoming(m) {
-    if (ON.lastDuel && performance.now() - ON.lastDuel < 12000) return;
-    ON.duel = { from: m.id, n: p_name(m), pow: +m.pow || 0, at: performance.now() };
+    if (ON.tt) return;
+    if (ON.lastDuel && performance.now() - ON.lastDuel < 15000) return;
+    if (ON.duel) { /* уже висит вызов — отказываем новому молча */ return; }
+    ON.duel = { id: m.id, from: m.id, n: p_name(m), pow: +m.pow || 0, at: performance.now(), left: TT_ACCEPT };
     const b = $('duelBox');
-    $('duelTxt').textContent = '⚔ ' + p_name(m) + ' вызывает тебя на дуэль!';
-    $('duelSub').textContent = 'сила соперника: ' + (m.pow || '?') + ' · твоя: ' + power();
+    if (!b) return;
+    $('duelTxt').textContent = '⚔ ' + p_name(m) + ' вызывает на ДУЭЛЬ';
+    $('duelSub').textContent = 'крестики-нолики · на кону 50 % монет · 15 c на ответ';
+    $('duelBar').style.transform = 'scaleX(1)';
     b.classList.add('on');
     beep();
-    setTimeout(() => { if (ON.duel && performance.now() - ON.duel.at > 14000) closeDuel(); }, 14000);
   }
   function closeDuel() {
     ON.duel = null;
     const b = $('duelBox'); if (b) b.classList.remove('on');
+  }
+  /* вызов провисел 15 c — засчитываем поражение */
+  function duelExpired() {
+    const d = ON.duel;
+    closeDuel();
+    chatPush({ sys: 1, m: '⏱ вызов от ' + (d ? d.n : 'игрока') + ' не принят — поражение' });
+    ttPay('lose', d ? d.n : 'соперник', d ? d.from : null, 0);
+    ON.lastDuel = performance.now();
   }
   function beep() {
     try {
@@ -7905,27 +7993,257 @@ window.__coin = (n) => { G.coins = Math.max(0, G.coins + n); save(); syncHUD(); 
       o.start(); o.stop(a.currentTime + 0.12);
     } catch (e) { }
   }
-  function duelAccepted(m) {
-    /* оба игрока считают исход одинаково: сравниваем силу */
-    const mine = power(), his = +m.pow || 0;
-    const win = mine >= his;
-    chatPush({ sys: 1, m: '⚔ ' + (win ? NAME + ' побеждает ' + p_name(m) : p_name(m) + ' побеждает ' + NAME) + ' (' + mine + ' vs ' + his + ')' });
-    pub('c', { t: 'dr', id: MYID, n: NAME, m: '' });
-    settleDuel(win, p_name(m), his);
-  }
-  /* вызов принят на нашей стороне — исход считаем сразу, чтобы награда была у обоих */
-  function settleDuel(win, foeName, his) {
-    if (win) {
-      const gain = 40 + Math.round((R.tier || 1) * 12);
-      G.coins += gain;
-      chatPush({ sys: 1, m: 'ты победил ' + foeName + ' · +' + gain + ' 🪙' });
-      if (window.__pop) window.__pop('ПОБЕДА +' + gain, R.px, 2.6);
-    } else {
-      chatPush({ sys: 1, m: 'ты проиграл ' + foeName });
+
+  /* вызвать ближайшего игрока */
+  function challengeNearest() {
+    if (ON.tt) { chatPush({ sys: 1, m: 'дуэль уже идёт' }); return; }
+    let best = null, bd = 1e9;
+    for (const id in ON.peers) {
+      const p = ON.peers[id];
+      const d = (p.x - R.px) ** 2 + (p.z - R.pz) ** 2;
+      if (d < bd) { bd = d; best = p; }
     }
+    if (!best) { chatPush({ sys: 1, m: 'рядом никого — некого вызвать' }); return; }
+    if (bd > 60 * 60) { chatPush({ sys: 1, m: 'ближайший игрок слишком далеко' }); return; }
+    pub('c', { t: 'd', id: MYID, n: NAME, to: best.id, pow: power() });
+    chatPush({ sys: 1, m: '⚔ вызов отправлен: ' + best.n + ' · ждём 15 c' });
     ON.lastDuel = performance.now();
+    /* локально держим «ожидание ответа» — если соперник бот, он ответит сам */
+    ON.awaitDuel = { id: best.id, n: best.n, at: performance.now(), bot: !!best.bot };
+  }
+
+  /* ═══ партия ═══ */
+  function ttStart(foe, mySign, host) {
     ON.duel = null;
+    $('duelBox').classList.remove('on');
+    const p = ON.peers[foe.id];
+    const hisCoins = p && p.coins != null ? p.coins : 400;
+    ON.tt = {
+      b: ['', '', '', '', '', '', '', '', ''],
+      my: mySign, turn: 'x', t: TT_TURN, host: !!host,
+      foeId: foe.id, foe: foe.n || 'соперник',
+      bot: !!(p && p.bot), hisCoins: hisCoins | 0,
+      over: false, seq: 0, delay: 0
+    };
+    renderTT();
+  }
+  function renderTT() {
+    const g = $('ttGrid'), box = $('ttBox');
+    if (!g || !box || !ON.tt) return;
+    if (!g.children.length) {
+      for (let i = 0; i < 9; i++) {
+        const c = document.createElement('b');
+        c.dataset.i = i;
+        c.onclick = () => ttMove(i);
+        g.appendChild(c);
+      }
+    }
+    const t = ON.tt;
+    for (let i = 0; i < 9; i++) {
+      const c = g.children[i], v = t.b[i];
+      c.textContent = v === 'x' ? '✕' : v === 'o' ? '◯' : '';
+      c.className = v ? 'f ' + v : '';
+    }
+    $('ttSub').textContent = t.over
+      ? ''
+      : (t.turn === t.my ? '⏳ твой ход · ' + Math.ceil(t.t) + ' c'
+        : '⏳ ход ' + t.foe + ' · ' + Math.ceil(t.t) + ' c');
+    $('ttPot').textContent = 'на кону: ' + Math.round((t.hisCoins || 0) * 0.5) + ' 🪙 его и ' +
+      Math.round((G.coins || 0) * 0.5) + ' 🪙 твоих';
+    $('ttBar').style.transform = 'scaleX(' + Math.max(0, Math.min(1, t.t / TT_TURN)) + ')';
+    box.classList.add('on');
+  }
+  function ttMove(i) {
+    const t = ON.tt;
+    if (!t || t.over) return;
+    if (t.turn !== t.my) return;
+    if (t.b[i]) return;
+    t.b[i] = t.my;
+    t.t = TT_TURN;
+    ttAfterMove();
+  }
+  function ttAfterMove() {
+    const t = ON.tt;
+    if (!t) return;
+    t.turn = t.turn === 'x' ? 'o' : 'x';
+    const line = ttWin(t.b, t.my);
+    if (line) { ttFinish('win', line); return; }
+    if (ttFull(t.b)) { ttFinish('draw', null); return; }
+    t.seq++;
+    renderTT();
+    pub('c', { t: 'tt', id: MYID, n: NAME, to: t.foeId, b: t.b, turn: t.turn, seq: t.seq });
+    /* бот-соперник думает и ходит сам */
+    if (t.bot) t.delay = 0.9 + Math.random() * 1.4;
+  }
+  function ttBotMove() {
+    const t = ON.tt;
+    if (!t || t.over || t.bot === false) return;
+    if (t.turn === t.my) return;
+    const b = t.b, me = t.my === 'x' ? 'o' : 'x';
+    /* 1) выиграть  2) не дать выиграть  3) центр/угол/любое */
+    let pick = -1;
+    for (const l of WINL) {
+      const v = l.map((k) => b[k]);
+      const cnt = v.filter((x) => x === me).length, emp = v.filter((x) => !x).length;
+      if (cnt === 2 && emp === 1) { pick = l[v.indexOf('')]; break; }
+    }
+    if (pick < 0) for (const l of WINL) {
+      const v = l.map((k) => b[k]);
+      const cnt = v.filter((x) => x === t.my).length, emp = v.filter((x) => !x).length;
+      if (cnt === 2 && emp === 1) { pick = l[v.indexOf('')]; break; }
+    }
+    if (pick < 0) {
+      const free = [];
+      for (let i = 0; i < 9; i++) if (!b[i]) free.push(i);
+      if (!free.length) return;
+      pick = free.indexOf(4) >= 0 ? 4 : free[(Math.random() * free.length) | 0];
+    }
+    b[pick] = me;
+    t.t = TT_TURN;
+    const line = ttWin(b, me);
+    if (line) { ttFinish('lose', line); return; }
+    if (ttFull(b)) { ttFinish('draw', null); return; }
+    t.turn = t.my;
+    t.seq++;
+    renderTT();
+  }
+  function ttFinish(res, line) {
+    const t = ON.tt;
+    if (!t || t.over) return;
+    t.over = true;
+    if (line) {
+      const g = $('ttGrid');
+      if (g) line.forEach((i) => { if (g.children[i]) g.children[i].classList.add('win'); });
+    }
+    const txt = res === 'win' ? '🏆 ПОБЕДА' : res === 'lose' ? '💀 ПОРАЖЕНИЕ' : '🤝 НИЧЬЯ';
+    $('ttRes').textContent = txt;
+    $('ttSub').textContent = '';
+    $('ttBar').style.transform = 'scaleX(0)';
+    if (!t.bot) pub('c', { t: 'tt', id: MYID, n: NAME, to: t.foeId, b: t.b, turn: t.turn, seq: ++t.seq, done: res });
+    ttPay(res, t.foe, t.foeId, t.hisCoins);
+    setTimeout(() => {
+      ON.tt = null;
+      const b = $('ttBox'); if (b) b.classList.remove('on');
+      $('ttRes').textContent = '';
+    }, 3200);
+  }
+  /* исход и деньги: 50 % монет проигравшего победителю */
+  function ttPay(res, foeName, foeId, hisCoins) {
+    ON.lastDuel = performance.now();
+    if (res === 'draw') {
+      chatPush({ sys: 1, m: '🤝 ничья с ' + foeName + ' — без потерь' });
+      return;
+    }
+    if (res === 'win') {
+      const his = Math.max(50, hisCoins | 0 || 400);
+      const gain = Math.max(1, Math.round(his * 0.5));
+      G.coins = (G.coins || 0) + gain;
+      chatPush({ sys: 1, m: '🏆 ты обыграл ' + foeName + ' · +' + gain + ' 🪙 (50 %)' });
+      if (window.__pop) window.__pop('+' + gain + ' 🪙', R.px, 3.0);
+      if (foeId && ON.peers[foeId]) {
+        const p = ON.peers[foeId];
+        p.coins = Math.max(0, (p.coins | 0) - gain);
+        if (!p.bot) pub('c', { t: 'ttw', id: MYID, n: NAME, to: foeId, rob: gain });
+      }
+      beep();
+    } else {
+      const rob = Math.max(1, Math.round((G.coins || 0) * 0.5));
+      G.coins = Math.max(0, (G.coins || 0) - rob);
+      chatPush({ sys: 1, m: '💀 ' + foeName + ' обыграл тебя · −' + rob + ' 🪙' });
+      if (window.__pop) window.__pop('-' + rob + ' 🪙', R.px, 3.0);
+      /* соперник получит деньги своей стороной; страхуемся, что он их зачислит */
+      if (foeId && !(ON.peers[foeId] && ON.peers[foeId].bot)) {
+        pub('c', { t: 'ttw', id: MYID, n: NAME, to: foeId, rob: rob, gift: 1 });
+      }
+    }
     try { if (window.__save) window.__save(); } catch (e) { }
+  }
+
+  /* соперник принял наш вызов → начинаем партию, мы крестики */
+  function duelAccepted(m) {
+    const a = ON.awaitDuel;
+    ON.awaitDuel = null;
+    if (ON.tt || !a || a.id !== m.id) return;
+    ttStart({ id: m.id, n: p_name(m) }, 'x', true);
+    chatPush({ sys: 1, m: '⚔ ' + p_name(m) + ' принял вызов — твой ход' });
+    beep();
+  }
+  /* ход соперника */
+  function ttRemote(m) {
+    const t = ON.tt;
+    if (!t || m.id !== t.foeId) return;
+    t.b = (m.b || []).slice(0, 9).map((v) => (v === 'x' || v === 'o' ? v : ''));
+    const foeSign = t.my === 'x' ? 'o' : 'x';
+    const myLine = ttWin(t.b, t.my), foeLine = ttWin(t.b, foeSign);
+    if (myLine) {
+      t.over = true; t.turn = t.my;
+      ttClaims(myLine, 'win');
+      return;
+    }
+    if (foeLine) {
+      t.over = true;
+      ttClaims(foeLine, 'lose');
+      return;
+    }
+    if (ttFull(t.b)) { t.over = true; ttClaims(null, 'draw'); return; }
+    t.turn = m.turn === 'x' || m.turn === 'o' ? m.turn : t.turn;
+    t.t = TT_TURN;
+    renderTT();
+  }
+  /* общий финиш для «чужого» хода: подсветка + выплата */
+  function ttClaims(line, res) {
+    const t = ON.tt;
+    if (!t) return;
+    const g = $('ttGrid');
+    if (g && line) line.forEach((i) => { if (g.children[i]) g.children[i].classList.add('win'); });
+    $('ttRes').textContent = res === 'win' ? '🏆 ПОБЕДА' : res === 'lose' ? '💀 ПОРАЖЕНИЕ' : '🤝 НИЧЬЯ';
+    $('ttSub').textContent = '';
+    $('ttBar').style.transform = 'scaleX(0)';
+    renderTT();
+    ttPay(res, t.foe, t.foeId, t.hisCoins);
+    setTimeout(() => {
+      ON.tt = null;
+      const b = $('ttBox'); if (b) b.classList.remove('on');
+      $('ttRes').textContent = '';
+    }, 3200);
+  }
+  /* соперник сообщил об исходе — только для чата, деньги уже посчитаны локально */
+  function ttRemoteWin(m) {
+    chatPush({ sys: 1, m: '⚔ ' + p_name(m) + ' закончил дуэль' });
+  }
+
+  /* таймеры дуэли и партии */
+  function duelTick(dt) {
+    /* пока висит вызов или идёт партия — мир на паузе */
+    window.__duelPause = !!(ON.tt || ON.duel);
+    /* ожидание ответа на наш вызов */
+    const a = ON.awaitDuel;
+    if (a && performance.now() - a.at > TT_ACCEPT * 1000) {
+      ON.awaitDuel = null;
+      if (a.bot) {
+        /* бот «согласился» */
+        if (!ON.tt) { ttStart({ id: a.id, n: a.n }, 'x', true); chatPush({ sys: 1, m: '⚔ ' + a.n + ' принял вызов' }); }
+      } else {
+        chatPush({ sys: 1, m: a.n + ' не ответил — вызов снят' });
+      }
+    }
+    /* входящий вызов: 15 c */
+    if (ON.duel) {
+      ON.duel.left -= dt;
+      const b = $('duelBar');
+      if (b) b.style.transform = 'scaleX(' + Math.max(0, ON.duel.left / TT_ACCEPT) + ')';
+      if (ON.duel.left <= 0) duelExpired();
+    }
+    /* партия: 10 c на ход */
+    const t = ON.tt;
+    if (!t || t.over) return;
+    t.t -= dt;
+    if (t.bot && t.turn !== t.my) {
+      t.delay -= dt;
+      if (t.delay <= 0) { ttBotMove(); return; }
+    }
+    if (t.t <= 0) { ttFinish('lose', null); return; }
+    $('ttBar').style.transform = 'scaleX(' + Math.max(0, t.t / TT_TURN) + ')';
   }
 
   /* ═══ таблица лидеров ═══ */
@@ -7986,12 +8304,10 @@ window.__coin = (n) => { G.coins = Math.max(0, G.coins + n); save(); syncHUD(); 
       e.stopPropagation();
       if (e.key === 'Enter') { sendChat(); e.preventDefault(); }
     });
+    /* ⚔ кнопка = вызвать на дуэль в крестики-нолики */
     bDuel.onclick = () => {
-      ON.pvp = ON.pvp ? 0 : 1;
-      bDuel.classList.toggle('on', !!ON.pvp);
-      $('pvpTxt').textContent = ON.pvp ? 'БОЙ ВКЛ' : 'БОЙ';
-      chatPush({ sys: 1, m: ON.pvp ? '⚔ PvP включён: бей игроков рядом и забирай 50% их золота' : 'PvP выключен' });
-      if (ON.pvp && window.__pop) window.__pop('⚔ PvP', R.px, 2.6);
+      if (ON.tt) { chatPush({ sys: 1, m: 'дуэль уже идёт' }); return; }
+      challengeNearest();
     };
     const bTop = $('btnTop');
     if (bTop) bTop.onclick = () => { renderTop(); $('topBox').classList.add('on'); };
@@ -8002,12 +8318,10 @@ window.__coin = (n) => { G.coins = Math.max(0, G.coins + n); save(); syncHUD(); 
       const d = ON.duel;
       pub('c', { t: 'da', id: MYID, n: NAME, to: d.from, pow: power() });
       closeDuel();
-      settleDuel(power() >= (d.pow || 0), d.n || 'соперник', d.pow || 0);
-    };
-    $('duelNo').onclick = () => {
-      if (!ON.duel) return;
-      pub('c', { t: 'dx', id: MYID, n: NAME, to: ON.duel.from });
-      closeDuel();
+      /* мы отвечаем вторыми — играем ноликами */
+      ttStart({ id: d.from, n: d.n || 'соперник' }, 'o', false);
+      chatPush({ sys: 1, m: '⚔ дуэль с ' + (d.n || 'соперником') + ' · на кону 50 % монет' });
+      beep();
     };
     try { connect(0); } catch (e) { console.warn('online failed', e); }
   }
@@ -8027,6 +8341,7 @@ window.__coin = (n) => { G.coins = Math.max(0, G.coins + n); save(); syncHUD(); 
     mkBots();
     botTick(dt);
     pvpTick(dt);
+    duelTick(dt);
     peerTick(dt);
     /* сторожевой таймер: свой ретранслятор не умеет сам лечиться — если он
        молча умер, переподключаемся. mqtt.js лечится сам. */
@@ -8054,6 +8369,9 @@ window.__coin = (n) => { G.coins = Math.max(0, G.coins + n); save(); syncHUD(); 
     if (acc > 0.25) { acc = 0; }
   }
   window.__onTick = tick;
+  /* отладочные хуки (используются автотестами) */
+  window.__duelIn = duelIncoming;
+  window.__ttState = () => ON.tt;
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
