@@ -7662,10 +7662,16 @@ window.__T = T; window.__pop = popText; window.__chat = 1; window.__save = save;
     let opened = false;
     mq.onstate = (s) => { if (s === 'offline' && !opened) setState('off'); };
     mq.onopen = () => {
+      const first = !opened;
       opened = true;
       setState('online');
       mq.sub(TP + 'p'); mq.sub(TP + 'c');
-      chatPush({ sys: 1, m: 'подключено · ' + BROKERS[i].split('/')[2] });
+      /* mqtt.js переподключается сам — приветствие пишем только один раз,
+         иначе чат забивается одинаковыми строками */
+      if (first && !ON.hello) {
+        ON.hello = 1;
+        chatPush({ sys: 1, m: 'подключено · ' + BROKERS[i].split('/')[2] });
+      }
     };
     mq.onclose = () => {
       if (seq !== connSeq) return;
