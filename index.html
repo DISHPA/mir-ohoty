@@ -6966,26 +6966,21 @@ let downX = 0, downY = 0, downT = 0, moved = false;
 /* ── авто-движение: ищет ближайшую добычу, обходит препятствия ── */
 function autoMove() {
   let bestScore = -1e9, tx = null, tz = null;
-  /* ── режим ПВП: держимся в красном круге и идём на ближайшего игрока ── */
-  if (window.__pvpMode) {
-    const st = window.__pvpSteer ? window.__pvpSteer() : null;
-    if (st) { tx = st.x; tz = st.z; }
-    else if (!inPvpZone(R.px, R.pz)) {
-      const d = Math.hypot(R.px, R.pz) || 1;
-      tx = R.px * (ZONE_R * 0.7) / d; tz = R.pz * (ZONE_R * 0.7) / d;
-      if (d < 1) { tx = 0; tz = 0; }
-    }
-    if (tx != null) {
-      const dx0 = tx - R.px, dz0 = tz - R.pz;
-      const L0 = Math.hypot(dx0, dz0) || 1;
-      if (L0 < 1.5) { R.mvx = 0; R.mvz = 0; return; }
-      R.mvx = dx0 / L0; R.mvz = dz0 / L0;
-      UI.hint.classList.remove('on');
-      return;
-    }
+  /* ── режим ПВП: сначала заходим в красный круг, дальше фармим как обычно ── */
+  if (window.__pvpMode && !inPvpZone(R.px, R.pz)) {
+    const d = Math.hypot(R.px, R.pz) || 1;
+    tx = d < 1 ? 0 : R.px * (ZONE_R * 0.7) / d;
+    tz = d < 1 ? 0 : R.pz * (ZONE_R * 0.7) / d;
+    const dx0 = tx - R.px, dz0 = tz - R.pz;
+    const L0 = Math.hypot(dx0, dz0) || 1;
+    R.mvx = dx0 / L0; R.mvz = dz0 / L0;
+    UI.hint.classList.remove('on');
+    return;
   }
   for (const o of objs) {
     if (o.dead || o.dying != null) continue;
+    /* в ПВП-режиме не выбегаем из круга за добычей */
+    if (window.__pvpMode && !inPvpZone(o.g.position.x, o.g.position.z)) continue;
     const d = distTo(o);
     if (d > 46) continue;
     let s = 60 - d * 1.1 + Math.min(20, o.gold * 0.35);
@@ -6996,7 +6991,16 @@ function autoMove() {
   if (tx == null) {
     /* нечего бить — патрулируем: идём к лагерю или кружим по миру */
     const d0 = Math.hypot(R.px, R.pz);
-    if (d0 > 30) { tx = 0; tz = 0; }
+    if (window.__pvpMode) {
+      /* в ПВП-режиме патрулируем только внутри круга */
+      R.wander = (R.wander || 0) + 1;
+      if (R.wander % 60 === 1 || !R.wx) {
+        const a = Math.random() * 6.283;
+        const r = Math.random() * ZONE_R * 0.75;
+        R.wx = Math.cos(a) * r; R.wz = Math.sin(a) * r;
+      }
+      tx = R.wx; tz = R.wz;
+    } else if (d0 > 30) { tx = 0; tz = 0; }
     else {
       R.wander = (R.wander || 0) + 1;
       if (R.wander % 90 === 1 || !R.wx) {
@@ -7875,14 +7879,28 @@ window.__pvpZone = inPvpZone; window.__ZONE_R = ZONE_R;
         p.x = Math.max(-146, Math.min(146, p.x + (dx / len) * sp * dt));
         p.z = Math.max(-146, Math.min(146, p.z + (dz / len) * sp * dt));
       }
-      p.tier = 1 + Math.floor((Math.abs(p.x) + Math.abs(p.z)) / 130);
-      /* кошелёк всегда держится около «100 мобов его уровня»: после проигрыша
-         в дуэли и при смене тира бот потихоньку добирает золото обратно */
-      const want = botCoins(p.tier, +String(p.id).replace('bot', '') || 0);
-      if (p.coins == null) p.coins = want;
-      else if (p.coins < want) p.coins = Math.min(want, p.coins + Math.max(1, want * 0.06) * dt);
-      else if (p.coins > want * 1.35) p.coins = Math.max(want, p.coins - want * 0.05 * dt);
+      /* ── у ботов своя прокачка: уровень растёт со временем фарма ── */
+      if (p.lvlT == null) { p.lvlT = 0; p.exp = 0; }
+      p.lvlT += dt;
+      /* за каждые 25 c фарма — новый тир (максимум 40) */
+      const wantTier = Math.max(1, Math.min(40, 1 + Math.floor(p.lvlT / 25)));
+      if (wantTier > p.tier) {
+        p.tier = wantTier;
+        p.pow = (p.pow || 0) + 6 + Math.round(Math.random() * 10);
+        /* бот похвастался новым тиром */
+        if (Math.random() < 0.5) chatPush({ n: p.n, m: 'апнул ' + p.tier + ' тир, сила ' + p.pow });
+      }
+      p.tier = 1 + Math.floor((Math.abs(p.x) + Math.abs(p.z)) / 130) > p.tier
+        ? 1 + Math.floor((Math.abs(p.x) + Math.abs(p.z)) / 130) : p.tier;
+      /* ── свой фарм: золото капает из убитых мобов, растёт с тиром ── */
+      if (p.coins == null) p.coins = botCoins(p.tier, +String(p.id).replace('bot', '') || 0);
+      const farmRate = mobGold(p.tier) * 1.6;   /* ≈1.6 моба в секунду */
+      p.coins += farmRate * dt;
+      /* потолок: 400 мобов его уровня, чтобы не бесконечно богател */
+      const cap = botCoins(p.tier, +String(p.id).replace('bot', '') || 0) * 4;
+      if (p.coins > cap) p.coins = cap;
       p.coins = Math.round(p.coins);
+      p.hp = 100;
       p.chatT -= dt;
       if (p.chatT <= 0) {
         p.chatT = 26 + Math.random() * 45;
@@ -7995,65 +8013,42 @@ window.__pvpZone = inPvpZone; window.__ZONE_R = ZONE_R;
   }
   function p_name(m) { return String(m.n || 'игрок').slice(0, 14); }
 
-  /* ═══ PvP: режим «БОЙ» — бьём живых игроков рядом ═══ */
-  function peerMaxHp(p) { return 90 + (p.tier || 1) * 45 + (p.pow || 0) * 1.1; }
-  function peerHp(p) { if (p.php == null) p.php = peerMaxHp(p); return p.php; }
-
+  /* ═══ PvP = ТОЛЬКО дуэли (крестики-нолики). Урона по игрокам нет ═══ */
   function pvpTick(dt) {
     if (!ON.pvp || !R.on) return;
     ON.atkT -= dt;
-    /* вне красной зоны PvP не работает: сначала надо зайти в круг */
+    /* вне красной зоны вызовы запрещены: сначала надо зайти в круг */
     if (!inZone(R.px, R.pz)) {
       if (ON.atkT <= 0 && !ON.zoneWarned) {
-        ON.atkT = 4; ON.zoneWarned = 1;
-        chatPush({ sys: 1, m: '🔵 ПВЕ-зона: PvP запрещено, иди в красный круг к центру' });
+        ON.atkT = 5; ON.zoneWarned = 1;
+        chatPush({ sys: 1, m: '🔵 ПВЕ-зона: дуэли запрещены, иди в красный круг к центру' });
       }
       return;
     }
     ON.zoneWarned = 0;
+    /* в круге автоматически кидаем вызов ближайшему игроку */
+    if (ON.tt || ON.duel || ON.awaitDuel) return;
+    if (ON.atkT > 0) return;
+    if (performance.now() - (ON.lastDuel || 0) < 20000) return;
     let best = null, bd = 1e9;
     for (const id in ON.peers) {
       const p = ON.peers[id];
       if (!inZone(p.x, p.z)) continue;
       const d = (p.x - R.px) ** 2 + (p.z - R.pz) ** 2;
-      if (d < bd) { bd = d; best = p; }
+      if (p.bot) { if (d < bd) { bd = d; best = p; } }
     }
-    if (!best) { if (ON.atkT <= 0) { ON.atkT = 1.6; chatPush({ sys: 1, m: 'рядом никого — ищи игроков' }); } return; }
-    if (bd > 3.4 * 3.4) return;
-    if (ON.atkT > 0) return;
-    ON.atkT = 0.34;
-    const dmg = Math.max(6, Math.round((window.__dmgNow ? window.__dmgNow() : 20) * 0.75));
-    if (best.g && window.__atkAnim) window.__atkAnim({ g: best.g.g });
-    best.php = peerHp(best) - dmg;
-    best.flashT = 0.25;
-    if (window.__pop) window.__pop('-' + dmg, best.g ? best.g.g.position.x : R.px, 2.2);
-    const mx = peerMaxHp(best);
-    if (best.php <= 0) {
-      best.php = mx;
-      const hisCoins = best.coins != null ? best.coins : Math.round(60 + (best.tier || 1) * 25);
-      const rob = Math.max(1, Math.round(hisCoins * 0.5));
-      best.coins = Math.max(0, hisCoins - rob);
-      ON.killed++; ON.robbed += rob;
-      if (window.__coin) window.__coin(rob);
-      chatPush({ sys: 1, m: '💀 ты убил ' + best.n + ' · забрал ' + rob + ' 🪙 (50%)' });
-      if (window.__pop) window.__pop('+' + rob + ' 🪙', R.px, 3.0);
-      if (best.bot) {
-        /* бот отлетает и возвращается через пару секунд */
-        setTimeout(() => { const a = Math.random() * 6.28; best.x = R.px + Math.cos(a) * 22; best.z = R.pz + Math.sin(a) * 22; }, 2200);
-      } else {
-        pub('c', { t: 'k', id: MYID, n: NAME, to: best.id, rob: rob });
-      }
-      pub('p', { id: MYID, n: NAME, x: +R.px.toFixed(2), z: +R.pz.toFixed(2), tier: R.tier || 1, hp: Math.round(R.hp || 0), pow: power() });
+    if (!best) {
+      ON.atkT = 2.5;
+      if (!ON.noFoeWarn) { ON.noFoeWarn = 1; chatPush({ sys: 1, m: '⚔ в круге никого — фармлю мобов' }); }
+      return;
     }
+    ON.atkT = 3;
+    ON.noFoeWarn = 0;
+    challengeNearest();
   }
+  /* попадание по игрокам отключено — оставлено для совместимости */
   function onKilled(m) {
-    /* нас убили: отдаём половину золота убийце */
-    const rob = Math.max(1, Math.round((G.coins || 0) * 0.5));
-    G.coins = Math.max(0, G.coins - rob);
-    try { if (window.__save) window.__save(); } catch (e) { }
-    chatPush({ sys: 1, m: '💀 ' + p_name(m) + ' убил тебя и забрал ' + rob + ' 🪙' });
-    pub('c', { t: 'kr', id: MYID, n: NAME, to: m.id, rob: rob });
-    if (window.__pop) window.__pop('-' + rob + ' 🪙', R.px, 3.0);
+    chatPush({ sys: 1, m: '🛡 ' + p_name(m) + ': урон по игрокам отключён — только дуэли' });
   }
 
   let connSeq = 0;
@@ -8415,8 +8410,9 @@ window.__pvpZone = inPvpZone; window.__ZONE_R = ZONE_R;
 
   /* таймеры дуэли и партии */
   function duelTick(dt) {
-    /* пока висит вызов или идёт партия — мир на паузе */
-    window.__duelPause = !!(ON.tt || ON.duel || ON.awaitDuel);
+    /* мир НЕ встаёт на паузу: и герой, и боты продолжают фармить мобов,
+       пока идёт вызов или партия в крестики-нолики */
+    window.__duelPause = false;
     /* ожидание ответа на наш вызов */
     const a = ON.awaitDuel;
     if (a) {
@@ -8511,7 +8507,7 @@ window.__pvpZone = inPvpZone; window.__ZONE_R = ZONE_R;
     if (a) a.classList.toggle('on', !pvp);
     if (b) b.classList.toggle('on', !!pvp);
     if (pvp) {
-      chatPush({ sys: 1, m: '⚔ ПВП-режим: держусь в красном круге, атакую игроков · дроп +50 %' });
+      chatPush({ sys: 1, m: '⚔ ПВП-режим: иду в красный круг, автоматически вызываю на дуэль · мобов бью как обычно · дроп +50 %' });
       if (G.auto) chatPush({ sys: 1, m: '🤖 автопилот ведёт к центру' });
     } else {
       chatPush({ sys: 1, m: '🛡 ПВЕ-режим: только монстры, дуэли выключены' });
