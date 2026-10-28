@@ -7722,17 +7722,29 @@ window.__coin = (n) => { G.coins = Math.max(0, G.coins + n); save(); syncHUD(); 
     'я на 12 тире сдох за секунду',
     'апнул скорость, теперь не догоняют'
   ];
+  /* золото одного моба данного тира — та же формула, что в spawn() */
+  function mobGold(tier) {
+    tier = Math.max(1, tier | 0);
+    return Math.round((2 + tier * 1.1) * (1 + Math.pow(tier, 1.35) * 0.35));
+  }
+  /* кошелёк бота: примерно 100 мобов его уровня, ±10 % чтобы не были близнецами */
+  function botCoins(tier, seed) {
+    const base = mobGold(tier) * 100;
+    const k = 0.9 + ((seed * 137.508) % 1) * 0.2;
+    return Math.round(base * k);
+  }
   function mkBots() {
     if (ON.botsMade) return;
     ON.botsMade = 1;
     BOT_DEF.forEach((b, i) => {
       const a = Math.random() * 6.28, d = 14 + Math.random() * 24;
+      const tier = Math.max(1, R.tier | 0);
       ON.peers['bot' + i] = {
         id: 'bot' + i, n: b.n, bot: 1, g: null, seen: performance.now(),
         x: R.px + Math.cos(a) * d, z: R.pz + Math.sin(a) * d,
-        tier: Math.max(1, R.tier | 0), hp: 100,
+        tier, hp: 100,
         pow: b.pw + ((Math.random() * 80) | 0),
-        coins: 300 + ((Math.random() * 900) | 0),
+        coins: botCoins(tier, i),
         tgt: null, tgtT: 0, chatT: 14 + Math.random() * 30, duelT: 70 + Math.random() * 90
       };
     });
@@ -7767,6 +7779,13 @@ window.__coin = (n) => { G.coins = Math.max(0, G.coins + n); save(); syncHUD(); 
         p.z = Math.max(-146, Math.min(146, p.z + (dz / len) * sp * dt));
       }
       p.tier = 1 + Math.floor((Math.abs(p.x) + Math.abs(p.z)) / 130);
+      /* кошелёк всегда держится около «100 мобов его уровня»: после проигрыша
+         в дуэли и при смене тира бот потихоньку добирает золото обратно */
+      const want = botCoins(p.tier, +String(p.id).replace('bot', '') || 0);
+      if (p.coins == null) p.coins = want;
+      else if (p.coins < want) p.coins = Math.min(want, p.coins + Math.max(1, want * 0.06) * dt);
+      else if (p.coins > want * 1.35) p.coins = Math.max(want, p.coins - want * 0.05 * dt);
+      p.coins = Math.round(p.coins);
       p.chatT -= dt;
       if (p.chatT <= 0) {
         p.chatT = 26 + Math.random() * 45;
