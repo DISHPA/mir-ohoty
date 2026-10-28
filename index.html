@@ -64,7 +64,7 @@
   #skills button.rdy{border-color:#ffcc33;box-shadow:0 4px 0 rgba(0,0,0,.4),0 0 14px rgba(255,204,51,.55)}
 
   /* ── онлайн: чат и дуэли ── */
-  #onBar{position:absolute;left:10px;top:78px;display:flex;gap:6px;pointer-events:none;z-index:11}
+  #onBar{position:absolute;left:10px;top:78px;display:flex;gap:6px;pointer-events:none;z-index:40}
   #onBar button{pointer-events:auto;height:30px;padding:0 10px;border-radius:10px;cursor:pointer;
     border:3px solid #2b1e3a;background:rgba(24,16,34,.82);color:#cfe4ff;font-family:inherit;
     font-weight:900;font-size:11px;display:flex;align-items:center;gap:4px;
@@ -91,11 +91,12 @@
   #chatIn button{height:28px;width:34px;border-radius:9px;border:3px solid #2b1e3a;cursor:pointer;
     background:linear-gradient(#ffe07a,#ffb703);color:#3a2408;font-size:13px;font-family:inherit;
     font-weight:900;padding:0}
-  #duelBox{position:absolute;left:50%;top:84px;transform:translateX(-50%);z-index:14;
+  #duelBox{position:absolute;left:50%;top:84px;transform:translateX(-50%);z-index:42;
     display:none;flex-direction:column;align-items:center;gap:6px;padding:10px 14px;border-radius:16px;
-    background:rgba(24,10,30,.9);border:3px solid #ff4b8c;box-shadow:0 0 22px rgba(255,75,140,.5);
-    max-width:min(340px,88vw);text-align:center}
-  #duelBox.on{display:flex;pointer-events:auto}
+    background:rgba(24,10,30,.94);border:3px solid #ff4b8c;box-shadow:0 0 22px rgba(255,75,140,.5);
+    max-width:min(340px,88vw);text-align:center;pointer-events:auto}
+  #duelBox.on{display:flex}
+  #duelBox *{pointer-events:auto}
   #duelBox .dl{font-size:11px;color:#ffd6e7;line-height:1.35}
   #duelBox .ds{font-size:9.5px;color:#b79bc4}
   #duelBox .dr{display:flex;gap:6px;margin-top:2px}
@@ -108,7 +109,7 @@
     transform-origin:left center}
 
   /* ── дуэль: крестики-нолики ── */
-  #ttBox{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:22;
+  #ttBox{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:44;
     display:none;flex-direction:column;align-items:center;gap:7px;padding:13px 15px;border-radius:18px;
     background:rgba(20,9,28,.96);border:3px solid #ff4b8c;box-shadow:0 0 30px rgba(255,75,140,.55);
     width:min(300px,92vw);pointer-events:auto}
@@ -278,11 +279,6 @@
   </div>
   <div id="hpwrap"><i id="hpfill"></i><span id="hptxt">100 / 100</span></div>
   <div id="combo"></div>
-  <div id="onBar">
-    <button id="btnChat"><b>💬</b><span id="onTxt">ЧАТ</span><i id="onDot"></i></button>
-    <button id="btnDuel"><b>⚔</b><span id="pvpTxt">ДУЭЛЬ</span></button>
-    <button id="btnTop"><b>🏆</b><span>ТОП</span></button>
-  </div>
   <div id="chat">
     <div id="chatLog"></div>
     <div id="chatIn"><input id="chatMsg" maxlength="90" placeholder="сообщение..."><button id="chatSend">➤</button></div>
@@ -313,6 +309,12 @@
     <button data-s="rage"><b>🔥</b><i>ЯРОСТЬ</i><u></u></button>
     <button data-s="heal"><b>💚</b><i>ЛЕЧЕНИЕ</i><u></u></button>
   </div>
+</div>
+
+<div id="onBar">
+  <button id="btnChat"><b>💬</b><span id="onTxt">ЧАТ</span><i id="onDot"></i></button>
+  <button id="btnDuel"><b>⚔</b><span id="pvpTxt">ДУЭЛЬ</span></button>
+  <button id="btnTop"><b>🏆</b><span>ТОП</span></button>
 </div>
 
 <div class="ov on" id="start">
@@ -6178,7 +6180,7 @@ const R = {
   atkTimer: 0, atkAnim: 0, target: null, combo: 0, comboT: 0,
   rageT: 0, dashT: 0, ifrT: 0, shake: 0, steps: 0,
   nextSpawn: 12, t: 0, popped: 0, usedPhoenix: false, bossAlive: false,
-  cam: { x: 0, y: 5.2, z: 8.4, yaw: 0 }, manT: 0, inFw: 1, spotRot: 0, spotNext: 0
+  cam: { x: 0, y: 5.2, z: 8.4, yaw: 0, vx: 0, vz: 1 }, manT: 0, inFw: 1, spotRot: 0, spotNext: 0
 };
 const objs = [];
 const fx = [];
@@ -7536,24 +7538,40 @@ function step(dt) {
     d.d.style.opacity = k > 0.65 ? (1 - (k - 0.65) / 0.35).toFixed(2) : '1';
   }
 
-  /* ── камера: жёстко за героем, НЕ доворачивается за его курсом ── */
+  /* ── камера: смотрит В СТОРОНУ ЦЕНТРА КАРТЫ, герой всегда в кадре, плавно ── */
   if (R.manT > 0) R.manT = Math.max(0, R.manT - dt);
+
+  /* желаемое направление взгляда — от героя к центру мира */
+  let tdx = 0, tdz = 1;
+  const dCen = Math.hypot(R.px, R.pz);
+  if (dCen > 6) { tdx = -R.px / dCen; tdz = -R.pz / dCen; }
+  else { tdx = R.cam.vx != null ? R.cam.vx : 0; tdz = R.cam.vz != null ? R.cam.vz : 1; }
+  /* плавно доводим вектор взгляда (без рывков на разворотах) */
+  if (R.cam.vx == null) { R.cam.vx = tdx; R.cam.vz = tdz; }
+  const kv = Math.min(1, dt * 1.6);
+  R.cam.vx += (tdx - R.cam.vx) * kv;
+  R.cam.vz += (tdz - R.cam.vz) * kv;
+  const vl = Math.hypot(R.cam.vx, R.cam.vz) || 1;
+  R.cam.vx /= vl; R.cam.vz /= vl;
+  R.cam.yaw = Math.atan2(R.cam.vx, R.cam.vz);   /* движение остаётся экранно-относительным */
+
   const cy = R.cam.yaw, cd = CAM.z;
-  const tx2 = R.px - Math.sin(cy) * cd;
-  const tz2 = R.pz - Math.cos(cy) * cd;
+  /* камера позади героя относительно центра → центр карты впереди, герой в кадре */
+  const tx2 = R.px - R.cam.vx * cd;
+  const tz2 = R.pz - R.cam.vz * cd;
   const sh = R.shake;
   if (sh > 0) R.shake = Math.max(0, sh - dt * 3.2);
   const jx = sh ? (Math.random() - 0.5) * sh * 0.6 : 0;
   const jy = sh ? (Math.random() - 0.5) * sh * 0.5 : 0;
-  const k = Math.min(1, dt * 5.5);
+  const k = Math.min(1, dt * 3.2);
   camera.position.x += (tx2 - camera.position.x) * k;
   camera.position.z += (tz2 - camera.position.z) * k;
   camera.position.y += ((CAM.y + (R.dashT > 0 ? 0.9 : 0)) - camera.position.y) * k;
   camera.position.x += jx; camera.position.z -= jx;
   camera.lookAt(
-    R.px + Math.sin(cy) * 4.2,
+    R.px + R.cam.vx * 5.0,
     CAM.look + jy,
-    R.pz + Math.cos(cy) * 4.2
+    R.pz + R.cam.vz * 5.0
   );
 
   if (R.on) syncHUD();
@@ -7824,6 +7842,8 @@ window.__coin = (n) => { G.coins = Math.max(0, G.coins + n); save(); syncHUD(); 
       if (m.pow != null) p.pow = +m.pow;
       setState('online');
     } else if (sub === 'c') {
+      /* адресные сообщения (дуэль/партия) — только для нас */
+      if (m.to && m.to !== MYID && m.t !== 'm') return;
       if (m.t === 'm') chatPush({ n: p_name(m), m: String(m.m || '').slice(0, 90) });
       else if (m.t === 'd') duelIncoming(m);
       else if (m.t === 'da') duelAccepted(m);
@@ -7961,10 +7981,12 @@ window.__coin = (n) => { G.coins = Math.max(0, G.coins + n); save(); syncHUD(); 
   function duelIncoming(m) {
     if (ON.tt) return;
     if (ON.lastDuel && performance.now() - ON.lastDuel < 15000) return;
-    if (ON.duel) { /* уже висит вызов — отказываем новому молча */ return; }
+    if (ON.duel) return;            /* уже висит входящий вызов */
+    if (ON.awaitDuel) return;       /* мы сами кого-то вызвали — не отвлекаем */
     ON.duel = { id: m.id, from: m.id, n: p_name(m), pow: +m.pow || 0, at: performance.now(), left: TT_ACCEPT };
     const b = $('duelBox');
     if (!b) return;
+    const y = $('duelYes'); if (y) y.style.display = '';
     $('duelTxt').textContent = '⚔ ' + p_name(m) + ' вызывает на ДУЭЛЬ';
     $('duelSub').textContent = 'крестики-нолики · на кону 50 % монет · 15 c на ответ';
     $('duelBar').style.transform = 'scaleX(1)';
@@ -7997,24 +8019,48 @@ window.__coin = (n) => { G.coins = Math.max(0, G.coins + n); save(); syncHUD(); 
   /* вызвать ближайшего игрока */
   function challengeNearest() {
     if (ON.tt) { chatPush({ sys: 1, m: 'дуэль уже идёт' }); return; }
-    let best = null, bd = 1e9;
+    if (ON.awaitDuel) { chatPush({ sys: 1, m: 'уже ждём ответа на вызов' }); return; }
+    let best = null, bd = 1e9, bestBot = null, bbd = 1e9;
     for (const id in ON.peers) {
       const p = ON.peers[id];
       const d = (p.x - R.px) ** 2 + (p.z - R.pz) ** 2;
-      if (d < bd) { bd = d; best = p; }
+      if (p.bot) { if (d < bbd) { bbd = d; bestBot = p; } }
+      else if (d < bd) { bd = d; best = p; }
     }
+    /* боты отвечают всегда — если рядом есть бот, вызываем его;
+       живого игрока зовём только когда ботов нет вовсе */
+    if (bestBot) best = bestBot;
     if (!best) { chatPush({ sys: 1, m: 'рядом никого — некого вызвать' }); return; }
-    if (bd > 60 * 60) { chatPush({ sys: 1, m: 'ближайший игрок слишком далеко' }); return; }
     pub('c', { t: 'd', id: MYID, n: NAME, to: best.id, pow: power() });
     chatPush({ sys: 1, m: '⚔ вызов отправлен: ' + best.n + ' · ждём 15 c' });
     ON.lastDuel = performance.now();
-    /* локально держим «ожидание ответа» — если соперник бот, он ответит сам */
-    ON.awaitDuel = { id: best.id, n: best.n, at: performance.now(), bot: !!best.bot };
+    /* боты отвечают быстро, живой игрок — до 15 c */
+    const wait = best.bot ? 2.2 + Math.random() * 2.0 : TT_ACCEPT;
+    ON.awaitDuel = {
+      id: best.id, n: best.n, at: performance.now(),
+      bot: !!best.bot, wait: wait, at2: performance.now() + wait * 1000
+    };
+    /* показываем ожидание в окне вызова */
+    const b = $('duelBox');
+    if (b) {
+      $('duelTxt').textContent = '⚔ ждём ответа: ' + best.n;
+      $('duelSub').textContent = 'на кону 50 % монет · соперник думает…';
+      const y = $('duelYes'); if (y) y.style.display = 'none';
+      $('duelBar').style.transform = 'scaleX(1)';
+      b.classList.add('on');
+    }
+  }
+  function closeWait() {
+    ON.awaitDuel = null;
+    const b = $('duelBox'); if (b) b.classList.remove('on');
+    const y = $('duelYes'); if (y) y.style.display = '';
   }
 
   /* ═══ партия ═══ */
   function ttStart(foe, mySign, host) {
     ON.duel = null;
+    ON.awaitDuel = null;
+    const y0 = $('duelYes'); if (y0) y0.style.display = '';
     $('duelBox').classList.remove('on');
     const p = ON.peers[foe.id];
     const hisCoins = p && p.coins != null ? p.coins : 400;
@@ -8215,16 +8261,27 @@ window.__coin = (n) => { G.coins = Math.max(0, G.coins + n); save(); syncHUD(); 
   /* таймеры дуэли и партии */
   function duelTick(dt) {
     /* пока висит вызов или идёт партия — мир на паузе */
-    window.__duelPause = !!(ON.tt || ON.duel);
+    window.__duelPause = !!(ON.tt || ON.duel || ON.awaitDuel);
     /* ожидание ответа на наш вызов */
     const a = ON.awaitDuel;
-    if (a && performance.now() - a.at > TT_ACCEPT * 1000) {
-      ON.awaitDuel = null;
-      if (a.bot) {
-        /* бот «согласился» */
-        if (!ON.tt) { ttStart({ id: a.id, n: a.n }, 'x', true); chatPush({ sys: 1, m: '⚔ ' + a.n + ' принял вызов' }); }
-      } else {
-        chatPush({ sys: 1, m: a.n + ' не ответил — вызов снят' });
+    if (a) {
+      const left = (a.at2 - performance.now()) / 1000;
+      const b = $('duelBar');
+      if (b) b.style.transform = 'scaleX(' + Math.max(0, Math.min(1, left / (a.wait || TT_ACCEPT))) + ')';
+      if (left <= 0) {
+        ON.awaitDuel = null;
+        if (a.bot) {
+          /* бот «согласился» — начинаем партию, мы крестики */
+          if (!ON.tt) {
+            ttStart({ id: a.id, n: a.n }, 'x', true);
+            chatPush({ sys: 1, m: '⚔ ' + a.n + ' принял вызов — твой ход' });
+            beep();
+          }
+        } else {
+          chatPush({ sys: 1, m: a.n + ' не ответил — вызов снят' });
+          const y = $('duelYes'); if (y) y.style.display = '';
+          $('duelBox').classList.remove('on');
+        }
       }
     }
     /* входящий вызов: 15 c */
@@ -8248,8 +8305,9 @@ window.__coin = (n) => { G.coins = Math.max(0, G.coins + n); save(); syncHUD(); 
 
   /* ═══ таблица лидеров ═══ */
   /* отправляем свой результат на сервер бота — оттуда его видит /top */
-  let topSent = 0;
+  let topSent = 0, topDead = false;
   function pushTop() {
+    if (topDead) return;
     const now = performance.now();
     if (now - topSent < 25000) return;
     topSent = now;
@@ -8260,8 +8318,8 @@ window.__coin = (n) => { G.coins = Math.max(0, G.coins + n); save(); syncHUD(); 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ n: NAME, pow: power(), tier: R.tier || 1, coins: G.coins | 0, kills: ON.killed | 0 })
-      }).catch(() => { });
-    } catch (e) { }
+      }).then((r) => { if (!r.ok) topDead = true; }).catch(() => { topDead = true; });
+    } catch (e) { topDead = true; }
   }
 
   function renderTop() {
