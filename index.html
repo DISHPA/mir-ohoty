@@ -6192,7 +6192,12 @@ const cdMul = () => 1 / (1 + G.up.cd * 0.05 + gearBonus('cd') * 0.05);
 const skCdMul = (k) => cdMul() * (1 - Math.min(0.6, (G.skl[k] || 0) * 0.03));
 const luckCh = () => Math.min(0.5, G.up.luck * 0.02 + gearBonus('luck') + petBonus('luck'));
 const critCh = () => Math.min(0.65, G.up.crit * 0.025 + gearBonus('crit') + petBonus('crit'));
-const dmgCut = () => 1 / (1 + G.up.armor * 0.09 + gearBonus('armor') * 0.09) * (1 - Math.min(0.35, petBonus('armor')));
+const dmgCut = () => {
+  /* защита от деления на ноль и от «отрицательной брони», которая бы усиливала урон */
+  const den = Math.max(0.2, 1 + (G.up.armor | 0) * 0.09 + gearBonus('armor') * 0.09);
+  const pet = Math.max(0, Math.min(0.35, petBonus('armor') || 0));
+  return (1 / den) * (1 - pet);
+};
 
 /* ═══ бонусы экипировки ═══ */
 function gearItemStat(slot, it) {
@@ -6342,6 +6347,7 @@ function ring(x, y, z, col, big) {
 
 /* всплывающие числа (DOM) */
 function dn(text, x, y, z, cls) {
+  if (!UI.dmgLayer) return;
   const d = document.createElement('div');
   d.className = 'dn' + (cls ? ' ' + cls : '');
   d.textContent = text;
@@ -6515,8 +6521,11 @@ function hitObj(o, amount, silent) {
     if (crit) { shake(0.32); burst(ox, 1.0, oz, 0xffffff, 6); }
   }
   const fg = o.bar.userData.fg;
-  fg.scale.x = Math.max(0, o.hp / o.maxhp);
-  fg.material.color.setHex(o.hp / o.maxhp > 0.5 ? 0x55e05a : o.hp / o.maxhp > 0.25 ? 0xffcc33 : 0xff5566);
+  const frac = o.maxhp > 0 ? Math.max(0, Math.min(1, o.hp / o.maxhp)) : 0;
+  if (isFinite(frac)) {
+    fg.scale.x = frac;
+    fg.material.color.setHex(frac > 0.5 ? 0x55e05a : frac > 0.25 ? 0xffcc33 : 0xff5566);
+  }
   if (o.hp <= 0) killObj(o);
 }
 function killObj(o) {
@@ -6775,7 +6784,8 @@ function syncHUD() {
   UI.hp.style.width = (p * 100) + '%';
   UI.hp.style.background = p > 0.5 ? 'linear-gradient(#8dff6b,#2fbe3f)' : p > 0.25 ? 'linear-gradient(#ffe07a,#f0a500)' : 'linear-gradient(#ff9a9a,#e33b3b)';
   UI.hptxt.textContent = Math.ceil(R.hp) + ' / ' + Math.round(R.maxhp);
-  UI.dist.textContent = 'ГЛУБИНА ' + Math.floor(R.dist) + ' м · ур.' + R.tier;
+  UI.dist.textContent = 'ГЛУБИНА ' + Math.floor(R.dist) + ' м · ур.' + R.tier +
+    (R.bossAlive ? ' · ⚠ БОСС' : ' · до босса ' + Math.max(0, Math.ceil(1200 + (G.bosses || 0) * 700 - R.dist)) + ' м');
   UI.coins.textContent = '🪙 ' + G.coins;
 }
 let shopTab = 'up';
@@ -6854,6 +6864,14 @@ function renderShopSkl() {
 function renderStart() {
   UI.startstats.innerHTML = 'РЕКОРД: <em>' + Math.floor(G.best) + ' м</em>  •  ЗАБЕГОВ: <em>' + G.runs + '</em><br>ЗОЛОТО: <em>🪙 ' + G.coins + '</em>  •  ⚔ СИЛА: <em>' + gearScore() + '</em>';
   renderDaily();
+  /* ВАЖНО: стартовый экран возвращаем на место — иначе после магазина
+     не остаётся кнопки «БЕЖАТЬ» и забег вообще не начинается */
+  if (!R.on) {
+    UI.shop.classList.remove('on');
+    el('craft').classList.remove('on');
+    UI.over.classList.remove('on');
+    UI.start.classList.add('on');
+  }
 }
 
 /* ═══ ЕЖЕДНЕВНЫЕ ЗАДАНИЯ (награда — материалы) ═══ */
@@ -6920,9 +6938,12 @@ function resetRun() {
   R.speed = 0; R.slowT = 0; R.tier = 1;
   R.atkTimer = 0; R.atkAnim = 0; R.target = null;
   R.combo = 0; R.comboT = 0; R.rageT = 0; R.dashT = 0; R.ifrT = 0; R.shake = 0; R.crushT = 0; R._spdOn = false; if (UI.spd) UI.spd.classList.remove('on');
-  R.nextSpawn = 14; R.t = 0;
+  R.nextSpawn = 14; R.t = 0; R.spawnT = 0;
   R.usedPhoenix = false;
   R.bossAlive = false;
+  /* первый залп мобов сразу, чтобы не было пустого старта */
+  try { spawnWave(); spawnWave(); } catch (e) { }
+  R.spawnT = 0.6;
   for (const k in SK) { SK[k].t = 0; SK[k].last = SK[k].cd; }
   UI.revive.style.display = 'none';
   UI.offline.classList.remove('on');
@@ -6944,6 +6965,8 @@ function resetRun() {
 function gameOver() {
   if (R.over) return;
   R.on = false; R.over = true;
+  /* снимаем паузу магазина: иначе после смерти экран «конец» не оживёт */
+  R.shopPause = false;
   if (R.dist > G.best) { G.best = Math.floor(R.dist); }
   G.runs++; G.deaths++;
   save();
@@ -7354,10 +7377,16 @@ function step(dt) {
     /* ── шаг по миру ── */
     const moving = (R.mvx || R.mvz) && spd > 0;
     if (moving) {
-      R.px += R.mvx * spd * dt;
-      R.pz += R.mvz * spd * dt;
+      const nx = R.px + R.mvx * spd * dt;
+      const nz = R.pz + R.mvz * spd * dt;
+      const lim = 148;
+      const cx = clamp(nx, -lim, lim), cz = clamp(nz, -lim, lim);
+      /* дистанцию считаем по ФАКТИЧЕСКИ пройденному пути:
+         у границы мира герой стоит — прогресс не должен расти */
+      const realStep = Math.hypot(cx - R.px, cz - R.pz);
+      R.px = cx; R.pz = cz;
       R.ang = Math.atan2(R.mvx, R.mvz);
-      R.dist += spd * dt;
+      R.dist += realStep;
       R.tier = 1 + Math.floor(R.dist / 130);
     }
     const lim = 148;
@@ -8331,7 +8360,9 @@ window.__pvpZone = inPvpZone; window.__ZONE_R = ZONE_R;
       return;
     }
     if (res === 'win') {
-      const his = Math.max(50, hisCoins | 0 || 400);
+      /* берём реальный кошелёк соперника: пустой кошелёк = маленький куш, а не 400 с неба */
+      const raw = (typeof hisCoins === 'number' && isFinite(hisCoins)) ? Math.max(0, hisCoins | 0) : 400;
+      const his = Math.max(50, raw);
       const gain = Math.max(1, Math.round(his * 0.5));
       G.coins = (G.coins || 0) + gain;
       chatPush({ sys: 1, m: '🏆 ты обыграл ' + foeName + ' · +' + gain + ' 🪙 (50 %)' });
