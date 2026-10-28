@@ -14,19 +14,30 @@
 
   /* ── HUD ── */
   #hud{position:absolute;inset:0;pointer-events:none;z-index:10}
-  #top{position:absolute;left:10px;right:10px;top:8px;display:flex;align-items:center;gap:8px}
-  #hpwrap{position:absolute;left:10px;right:10px;top:46px;height:24px;border-radius:12px;
+  /* строка сверху не должна наезжать сама на себя: чипы сжимаются и
+     обрезаются многоточием, кнопки держат свой размер */
+  #top{position:absolute;left:10px;right:10px;top:calc(8px + env(safe-area-inset-top,0px));
+    display:flex;align-items:center;gap:6px;min-width:0;flex-wrap:nowrap}
+  #top>*{min-width:0;flex:0 0 auto}
+  #dist{flex:1 1 auto}
+  #hpwrap{position:absolute;left:10px;right:10px;top:calc(46px + env(safe-area-inset-top,0px));height:24px;border-radius:12px;
     background:rgba(24,16,34,.72);border:3px solid #2b1e3a;overflow:hidden;
     box-shadow:0 3px 0 rgba(0,0,0,.35)}
   #hpfill{display:block;height:100%;width:100%;border-radius:8px;
     background:linear-gradient(#8dff6b,#2fbe3f);transition:width .12s linear}
   #hpfill.low{background:linear-gradient(#ff9a6b,#e0392f)}
   #hptxt{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-    font-size:13px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.65);letter-spacing:.5px}
+    font-size:13px;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.65);letter-spacing:.5px;
+    overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding:0 6px}
   #dist{font-size:15px;color:#fff;padding:3px 10px;border-radius:11px;background:rgba(24,16,34,.72);
-    border:3px solid #2b1e3a;box-shadow:0 3px 0 rgba(0,0,0,.35)}
+    border:3px solid #2b1e3a;box-shadow:0 3px 0 rgba(0,0,0,.35);
+    flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    display:flex;gap:4px;align-items:center}
+  #distMain{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:0 1 auto}
+  #distSub{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:0 1 auto;opacity:.85}
   #coins{font-size:15px;color:#ffcc33;padding:3px 10px;border-radius:11px;background:rgba(24,16,34,.72);
-    border:3px solid #2b1e3a;box-shadow:0 3px 0 rgba(0,0,0,.35)}
+    border:3px solid #2b1e3a;box-shadow:0 3px 0 rgba(0,0,0,.35);
+    max-width:31vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   #btnShopG{pointer-events:auto;width:36px;height:32px;border-radius:11px;cursor:pointer;
     border:3px solid #2b1e3a;background:linear-gradient(#ffe07a,#ffb703);font-size:15px;line-height:1;
     box-shadow:0 3px 0 #8a5b00;display:none;align-items:center;justify-content:center;padding:0}
@@ -44,25 +55,28 @@
   #btnAuto.act{background:linear-gradient(#a8ffb0,#33cc55);box-shadow:0 0 0 3px rgba(60,255,120,.35),0 3px 0 #1c7a30}
   #btnAuto:active{transform:translateY(3px);box-shadow:0 0 0 #4a6c94}
 
-  #combo{position:absolute;left:50%;top:96px;transform:translateX(-50%) scale(.6);opacity:0;
+  #combo{position:absolute;left:50%;top:calc(150px + env(safe-area-inset-top,0px));transform:translateX(-50%) scale(.6);opacity:0;
     font-size:26px;color:#ffcc33;-webkit-text-stroke:4px #2b1e3a;paint-order:stroke fill;
     transition:transform .12s,opacity .12s}
   #combo.on{opacity:1;transform:translateX(-50%) scale(1)}
 
   /* ── онлайн: чат и дуэли ── */
-  #onBar{position:absolute;left:10px;top:78px;display:flex;gap:6px;pointer-events:none;z-index:40}
+  #onBar{position:absolute;left:10px;right:10px;top:calc(78px + env(safe-area-inset-top,0px));
+    display:flex;gap:6px;pointer-events:none;z-index:40;flex-wrap:wrap;min-width:0}
   #onBar button{pointer-events:auto;height:30px;padding:0 10px;border-radius:10px;cursor:pointer;
     border:3px solid #2b1e3a;background:rgba(24,16,34,.82);color:#cfe4ff;font-family:inherit;
     font-weight:900;font-size:11px;display:flex;align-items:center;gap:4px;
-    box-shadow:0 3px 0 rgba(0,0,0,.35)}
+    box-shadow:0 3px 0 rgba(0,0,0,.35);min-width:0;white-space:nowrap;flex:0 1 auto}
+  #onBar button span{min-width:0;overflow:hidden;text-overflow:ellipsis}
   #onBar button:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.35)}
   #onBar button.on{background:linear-gradient(#ff7a9c,#e01e50);color:#fff;
     border-color:#ff4b8c;box-shadow:0 3px 0 rgba(0,0,0,.35),0 0 14px rgba(255,75,140,.7)}
   #onBar button b{font-size:13px;line-height:1}
-  #zoneTag{position:absolute;left:10px;top:112px;z-index:40;pointer-events:none;
+  #zoneTag{position:absolute;left:10px;top:calc(112px + env(safe-area-inset-top,0px));z-index:40;pointer-events:none;
     font-weight:900;font-size:11px;letter-spacing:.5px;padding:3px 9px;border-radius:9px;
     border:2px solid rgba(0,0,0,.35);background:rgba(28,60,140,.82);color:#d8ecff;
-    text-shadow:0 1px 2px rgba(0,0,0,.6)}
+    text-shadow:0 1px 2px rgba(0,0,0,.6);max-width:calc(100vw - 20px);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   #zoneTag.red{background:rgba(180,24,58,.86);color:#ffe6ee;
     box-shadow:0 0 14px rgba(255,60,110,.65);border-color:rgba(255,90,130,.7)}
   #onDot{width:8px;height:8px;border-radius:50%;background:#ff4b5c;box-shadow:0 0 6px currentColor}
@@ -83,7 +97,7 @@
   #chatIn button{height:28px;width:34px;border-radius:9px;border:3px solid #2b1e3a;cursor:pointer;
     background:linear-gradient(#ffe07a,#ffb703);color:#3a2408;font-size:13px;font-family:inherit;
     font-weight:900;padding:0}
-  #duelBox{position:absolute;left:50%;top:84px;transform:translateX(-50%);z-index:42;
+  #duelBox{position:absolute;left:50%;top:calc(84px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:42;
     display:none;flex-direction:column;align-items:center;gap:6px;padding:10px 14px;border-radius:16px;
     background:rgba(24,10,30,.94);border:3px solid #ff4b8c;box-shadow:0 0 22px rgba(255,75,140,.5);
     max-width:min(340px,88vw);text-align:center;pointer-events:auto}
@@ -251,6 +265,23 @@
   @media (max-width:520px){
     #hpwrap{height:22px}
     .ov h1{font-size:23px}
+    #top{gap:5px}
+    #dist,#coins{font-size:12px;padding:3px 7px;border-width:2px}
+    #btnAuto,#btnShopG,#btnCraftG{width:32px;height:28px;font-size:13px;border-width:2px}
+    #onBar{gap:5px}
+    #onBar button{height:27px;padding:0 7px;font-size:10px;border-width:2px}
+    #onBar button b{font-size:11px}
+    #zoneTag{font-size:10px;padding:2px 7px}
+    #combo{font-size:21px}
+    #distSub{display:none}
+    #dist{padding:3px 7px}
+    #coins{font-size:12px}
+  }
+  @media (max-width:380px){
+    #dist,#coins{font-size:11px;padding:2px 6px}
+    #btnAuto,#btnShopG,#btnCraftG{width:29px;height:26px;font-size:12px}
+    #onBar button span{max-width:52px}
+    #coins{max-width:26vw}
   }
 </style>
 </head>
@@ -261,7 +292,7 @@
 <div id="dmg"></div>
 <div id="hud">
   <div id="top">
-    <div id="dist">0 м</div>
+    <div id="dist"><span id="distMain">0 м</span><span id="distSub"></span></div>
     <div id="coins">🪙 0</div>
     <button id="btnAuto">🤖</button>
     <button id="btnShopG">🛒</button>
@@ -6210,7 +6241,7 @@ const dmgs = [];
 
 const el = (id) => document.getElementById(id);
 const UI = {
-  hp: el('hpfill'), hptxt: el('hptxt'), dist: el('dist'), coins: el('coins'),
+  hp: el('hpfill'), hptxt: el('hptxt'), dist: el('dist'), distMain: el('distMain'), distSub: el('distSub'), coins: el('coins'),
   combo: el('combo'), hint: el('hint'), dmgLayer: el('dmg'),
   start: el('start'), over: el('over'), shop: el('shop'), shopG: el('btnShopG'), craftG: el('btnCraftG'),
   startstats: el('startstats'), overtxt: el('overtxt'), shopCoins: el('shopCoins'),
@@ -6712,14 +6743,24 @@ function bossStrike(o) {
 }
 
 /* ═══ UI ═══ */
+/* 12345 → 12.3К, 1234567 → 1.2М: длинные числа разрывали верхнюю панель */
+function numShort(v) {
+  const n = Math.floor(Math.abs(v));
+  if (n < 10000) return String(Math.floor(v));
+  const s = n >= 1e9 ? [1e9, 'Г'] : n >= 1e6 ? [1e6, 'М'] : [1e3, 'К'];
+  const r = Math.floor(v / s[0] * 10) / 10;
+  return (Number.isInteger(r) ? r : r.toFixed(1)) + s[1];
+}
 function syncHUD() {
   const p = clamp(R.hp / R.maxhp, 0, 1);
   UI.hp.style.width = (p * 100) + '%';
   UI.hp.style.background = p > 0.5 ? 'linear-gradient(#8dff6b,#2fbe3f)' : p > 0.25 ? 'linear-gradient(#ffe07a,#f0a500)' : 'linear-gradient(#ff9a9a,#e33b3b)';
-  UI.hptxt.textContent = Math.ceil(R.hp) + ' / ' + Math.round(R.maxhp);
-  UI.dist.textContent = 'ГЛУБИНА ' + Math.floor(R.dist) + ' м · ур.' + R.tier +
-    (R.bossAlive ? ' · ⚠ БОСС' : ' · до босса ' + Math.max(0, Math.ceil(1200 + (G.bosses || 0) * 700 - R.dist)) + ' м');
-  UI.coins.textContent = '🪙 ' + G.coins;
+  UI.hptxt.textContent = numShort(Math.ceil(R.hp)) + ' / ' + numShort(Math.round(R.maxhp));
+  /* короткая запись + сокращение больших чисел: на телефоне иначе не влезает.
+     «до босса» — отдельный span, на узких экранах он скрыт (см. CSS) */
+  UI.distMain.textContent = numShort(R.dist) + ' м · ур.' + R.tier;
+  UI.distSub.textContent = R.bossAlive ? '· ⚠БОСС' : '· 👑' + numShort(Math.max(0, Math.ceil(1200 + (G.bosses || 0) * 700 - R.dist)));
+  UI.coins.textContent = '🪙 ' + numShort(G.coins);
 }
 let shopTab = 'up';
 function renderShop() {
