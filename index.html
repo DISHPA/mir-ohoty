@@ -6144,7 +6144,7 @@ const R = {
   atkTimer: 0, atkAnim: 0, target: null, combo: 0, comboT: 0,
   rageT: 0, dashT: 0, ifrT: 0, shake: 0, steps: 0,
   nextSpawn: 12, t: 0, popped: 0, usedPhoenix: false, bossAlive: false,
-  cam: { x: 0, y: 5.2, z: 8.4, yaw: 0 }
+  cam: { x: 0, y: 5.2, z: 8.4, yaw: 0 }, manT: 0, inFw: 1
 };
 const objs = [];
 const fx = [];
@@ -6892,21 +6892,33 @@ function autoSkills() {
   if (SK.dash.t <= 0 && (mobs >= 3 || (mobs >= 2 && obs > 0) || (R.hp < R.maxhp * 0.35 && near >= 1))) trySkill('dash');
 }
 
-/* ── управление: WASD / стрелки / свайп-джойстик ── */
+/* ── управление: WASD / стрелки / свайп-джойстик (относительно камеры) ── */
 const keys = {};
-const MOVEMAP = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0],
-  w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0], W: [0, -1], S: [0, 1], A: [-1, 0], D: [1, 0],
-  ц: [0, -1], ы: [0, 1], ф: [-1, 0], в: [1, 0], Ц: [0, -1], Ы: [0, 1], Ф: [-1, 0], В: [1, 0] };
+/* [вперёд, вправо] в экранных осях: вверх = от игрока, вправо = вправо по экрану */
+const MOVEMAP = { ArrowUp: [1, 0], ArrowDown: [-1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1],
+  w: [1, 0], s: [-1, 0], a: [0, -1], d: [0, 1], W: [1, 0], S: [-1, 0], A: [0, -1], D: [0, 1],
+  ц: [1, 0], ы: [-1, 0], ф: [0, -1], в: [0, 1], Ц: [1, 0], Ы: [-1, 0], Ф: [0, -1], В: [0, 1] };
+/* переводим экранные оси в мировые через поворот камеры */
+function applyMove(fw, rx) {
+  const cy = R.cam.yaw;
+  const sy = Math.sin(cy), cyy = Math.cos(cy);
+  /* вперёд = (sin, cos); вправо = (-cos, sin) */
+  const mx = fw * sy - rx * cyy;
+  const mz = fw * cyy + rx * sy;
+  const L = Math.hypot(mx, mz) || 1;
+  R.mvx = mx / L; R.mvz = mz / L;
+  R.inFw = fw;
+  R.manT = 0.7;   /* пока игрок рулит, камера за героем не доворачивается */
+}
 function manualMove() {
-  let mx = 0, mz = 0;
+  let fw = 0, rx = 0;
   for (const k in keys) {
     if (!keys[k]) continue;
     const v = MOVEMAP[k];
-    if (v) { mx += v[0]; mz += v[1]; }
+    if (v) { fw += v[0]; rx += v[1]; }
   }
-  if (mx || mz) {
-    const L = Math.hypot(mx, mz) || 1;
-    R.mvx = mx / L; R.mvz = mz / L;
+  if (fw || rx) {
+    applyMove(clamp(fw, -1, 1), clamp(rx, -1, 1));
     UI.hint.classList.remove('on');
     return true;
   }
@@ -7190,7 +7202,7 @@ function step(dt) {
       if (G.auto) { autoMove(); autoSkills(); }
       else { R.mvx = 0; R.mvz = 0; }
     } else {
-      if (jOn) { R.mvx = jx; R.mvz = jz; }
+      if (jOn) applyMove(-jz, jx);   /* тянем вверх — идём вперёд по экрану */
       autoSkills();
     }
 
@@ -7465,7 +7477,8 @@ function step(dt) {
   }
 
   /* ── камера: следом за героем, плавно доворачивается за курсом ── */
-  if (R._moving) {
+  if (R.manT > 0) R.manT = Math.max(0, R.manT - dt);
+  if (R._moving && R.manT <= 0) {
     let dy = R.ang - R.cam.yaw;
     while (dy > Math.PI) dy -= 6.283185;
     while (dy < -Math.PI) dy += 6.283185;
